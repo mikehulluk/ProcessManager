@@ -26,9 +26,9 @@ footer = """
 """
 
 
-@app.route('/js/brython/<path:path>')
+@app.route('/js/<path:path>')
 def send_js(path):
-    src_dir = "/home/michael/dev/ProcessManager/src/processmanager/brython/www/src"
+    src_dir = "/home/michael/dev/ProcessManager/www/js/"
     return send_from_directory(src_dir, path)
 
 

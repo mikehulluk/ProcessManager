@@ -15,7 +15,7 @@ import websockets
 
 @asyncio.coroutine
 def hello(websocket, path):
-    print "Connection openned"
+    print ("Connection openned")
     name = yield from websocket.recv()
     print("< {}".format(name))
     greeting = "Hello {}!".format(name)
