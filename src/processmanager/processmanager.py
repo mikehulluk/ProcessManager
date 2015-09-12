@@ -15,11 +15,18 @@ import websockets
 
 @asyncio.coroutine
 def hello(websocket, path):
+    print "Connection openned"
     name = yield from websocket.recv()
     print("< {}".format(name))
     greeting = "Hello {}!".format(name)
     yield from websocket.send(greeting)
     print("> {}".format(greeting))
+
+    name = yield from websocket.recv()
+    print("< {}".format(name))
+    greeting = "Hello - round2 {}!".format(name)
+    yield from websocket.send(greeting)
+    print("> {} (round2)".format(greeting))
 
 print ("Launching server:")
 start_server = websockets.serve(hello, 'localhost', 8765)

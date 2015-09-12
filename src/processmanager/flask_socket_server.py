@@ -1,22 +1,10 @@
 #!/usr/bin/env python3
 
 from flask import Flask
-from flask_sockets import Sockets
 
 from flask import Flask, request, send_from_directory
 app = Flask(__name__, static_url_path='')
-sockets = Sockets(app)
 
-#@sockets.route('/echo')
-#def echo_socket(ws):
-#    print "echo_socket()"
-#    while True:
-#        message = ws.receive()
-#        ws.send(message)
-#
-##@app.route('/')
-##def hello():
-##    return 'Hello World!'
 
 header = """
 <html>
@@ -28,7 +16,6 @@ header = """
 """
 footer = """
 </script>
-<input id="zone"><button id="mybutton">click !</button>
 
 <button id="openbtn">Open connection</button>
 <br><input id="data"><button id="sendbtn" disabled>Send</button>
@@ -53,4 +40,4 @@ def br():
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)
