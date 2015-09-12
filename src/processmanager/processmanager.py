@@ -30,9 +30,8 @@ websockets_lock = Lock()
 def hello(websocket, path):
 
     # Add the websocket to the list:
-    websockets_lock.acquire()
-    websockets.append(websocket)
-    websockets_lock.release()
+    with websockets_lock:
+        websockets.append(websocket)
 
     print ("Connection openned")
     name = yield from websocket.recv()
@@ -50,9 +49,8 @@ def hello(websocket, path):
     print("> {} (round2)".format(greeting))
 
     # Remove the websocket:
-    websockets_lock.acquire()
-    websockets.remove(websocket)
-    websockets_lock.release()
+    with websockets_lock:
+        websockets.remove(websocket)
 
 
 
@@ -60,36 +58,38 @@ def hello(websocket, path):
 
 
 @asyncio.coroutine
-def generate_content(): 
+def generate_content_cr(): 
     print ("Starting generate content:")
     while(1):
         time.sleep(1)
+        send_data = "GENERATED_CONTENT"
 
-        websockets_lock.acquire()
-        print ("Sending content..")
-        print ("NWebsockets: %d" % len(websockets))
-        for websocket in websockets:
+        with websockets_lock:
+            print ("Sending content..")
+            print ("NWebsockets: %d" % len(websockets))
+            for websocket in websockets:
 
-            if websocket.open:
-                yield from websocket.send("GENERATED_CONTENT")
-        websockets_lock.release()
+                if websocket.open:
+                    yield from websocket.send(send_data)
 
 
-def generate_content_(): 
+def generate_content_thread(): 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    asyncio.get_event_loop().run_until_complete(generate_content())
+    asyncio.get_event_loop().run_until_complete(generate_content_cr())
     asyncio.get_event_loop().run_forever()
 
 
 
+
+# Spawn off the thread to take of reading input and forwarding it up to the web-sockets:
 print ("Started thread")
-tr = Thread(target=generate_content_, )
+tr = Thread(target=generate_content_thread, )
 tr.start()
-print ("Thread started")
 
 
 
+# And launch the websockets server:
 print ("Launching server:")
 start_server = ws.serve(hello, 'localhost', 8765)
 asyncio.get_event_loop().run_until_complete(start_server)
