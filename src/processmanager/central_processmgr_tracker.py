@@ -21,6 +21,7 @@ import multiprocessing
 #from multiprocessing import Process, Queue
 from threading import Thread, Lock
 import time
+import zmq
 websockets = []
 websockets_lock = Lock()
 
@@ -60,9 +61,19 @@ def hello(websocket, path):
 @asyncio.coroutine
 def generate_content_cr(): 
     print ("Starting generate content:")
+
+    port = "5556"
+    context = zmq.Context()
+    socket = context.socket(zmq.PAIR)
+    socket.bind("tcp://*:%s" % port)
+
     while(1):
         time.sleep(1)
-        send_data = "GENERATED_CONTENT"
+        #send_data = "GENERATED_CONTENT"
+        send_data = socket.recv()
+        send_data = str(send_data)
+        print (send_data, type(send_data))
+        #send_data = "jlkjl"
 
         with websockets_lock:
             print ("Sending content..")

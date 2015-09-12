@@ -10,7 +10,10 @@ def on_open(evt):
 def on_message(evt):
     # message reeived from server
     #alert("Message received : %s" %evt.data)
-    doc['outputwindow'] <= BR() + evt.data
+    div = doc['outputwindow']
+    div <= BR() + evt.data
+    div.scrollTop = div.scrollHeight;
+    #doc['outputwindow'] = evt.data + BR() + doc['outputwindow']
 
 def on_close(evt):
     # websocket is closed
