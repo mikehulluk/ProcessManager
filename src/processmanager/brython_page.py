@@ -1,5 +1,6 @@
 from browser import alert, document as doc
 from browser import websocket
+from browser.html import BR
 
 def on_open(evt):
     doc['sendbtn'].disabled = False
@@ -8,7 +9,8 @@ def on_open(evt):
 
 def on_message(evt):
     # message reeived from server
-    alert("Message received : %s" %evt.data)
+    #alert("Message received : %s" %evt.data)
+    doc['outputwindow'] <= BR() + evt.data
 
 def on_close(evt):
     # websocket is closed
