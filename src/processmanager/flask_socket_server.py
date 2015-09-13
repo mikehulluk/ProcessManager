@@ -63,7 +63,7 @@ footer = """
         <input id="data"><button id="sendbtn" disabled>Send</button>
         <button id="closebtn" disabled>Close connection</button>
         
-        <div  id='outputwindow' style="overflow:scroll; height:100px;">
+        <div  id='outputwindow' style="overflow:scroll; height:250px;">
         <code  id='outputcode' />
         </div>
 

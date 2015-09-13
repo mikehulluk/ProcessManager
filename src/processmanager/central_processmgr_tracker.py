@@ -1,13 +1,10 @@
 #! /usr/bin/python3
 
 
+import zmq
+import sys
 
-#processes = [
-#    # id, caption, command,
-#    (None, "Proc1", """cat "hello" """,)
-#    (None, "Proc2", """cat "hello" """,)
-#
-#        ]
+
 import logging
 logger = logging.getLogger('websockets.server')
 logger.setLevel(logging.ERROR)
@@ -18,16 +15,36 @@ import asyncio
 import websockets as ws
 
 import multiprocessing
-#from multiprocessing import Process, Queue
 from threading import Thread, Lock
 import time
+
+
 websockets = []
 websockets_lock = Lock()
 
 
 
 @asyncio.coroutine
-def hello(websocket, path):
+def websocket_handler(websocket, path):
+
+    init_data = [
+            {
+            'process_mgrs': [
+                    {'id':0, 'name':'Mgr1', 'processes': [
+                        {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                        {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                        ]
+                    },
+                    {'id':1, 'name':'Mgr2', 'processes': [
+                        {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                        {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                        ]
+                    },
+                    ]
+        }
+            ]
+    init_data_s = json.dumps(init_data, separators=(',',':'))
+    yield from websocket.send(init_data_s)
 
     # Add the websocket to the list:
     with websockets_lock:
@@ -61,28 +78,32 @@ import json
 def generate_content_cr():
     print ("Starting generate content:")
 
-    init_data = [
-            {
-            'process_mgrs': [
-                    {'id':0, 'name':'Mgr1', 'processes': [
-                        {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                        {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                        ]
-                    },
-                    {'id':1, 'name':'Mgr2', 'processes': [
-                        {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                        {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                        ]
-                    },
-                    ]
-        }
-            ]
+    port = "5556"
+    if len(sys.argv) > 1:
+        port =  sys.argv[1]
+        int(port)
 
-    init_data_s = json.dumps(init_data, separators=(',',':'))
-    #yield from websocket.send(init_data_s)
+    context = zmq.Context()
+    socket = context.socket(zmq.PAIR)
+    socket.bind("tcp://*:%s" % port)
+
+    #yield from socket.send(init_data_s)
+
+
+    #with websockets_lock:
+    #    print ("Sending content..")
+    #    print ("NWebsockets: %d" % len(websockets))
+    #    for websocket in websockets:
+
+    #        if websocket.open:
+    #            yield from websocket.send(init_data_s)
+
     while(1):
         time.sleep(1)
         send_data = "GENERATED_CONTENT"
+        send_data = "GENERATED_CONTENT"
+        send_data = socket.recv()
+        send_data = str(send_data) #socket.recv()
 
         with websockets_lock:
             print ("Sending content..")
@@ -111,7 +132,7 @@ tr.start()
 
 # And launch the websockets server:
 print ("Launching server:")
-start_server = ws.serve(hello, 'localhost', 8765)
+start_server = ws.serve(websocket_handler, 'localhost', 8765)
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()
 
