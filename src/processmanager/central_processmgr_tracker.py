@@ -18,6 +18,7 @@ import multiprocessing
 from threading import Thread, Lock
 import time
 
+import json
 
 websockets = []
 websockets_lock = Lock()
@@ -29,18 +30,20 @@ def websocket_handler(websocket, path):
 
     init_data = [
             {
-            'process_mgrs': [
-                    {'id':0, 'name':'Mgr1', 'processes': [
-                        {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                        {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
+            'config':{
+                'process_mgrs': [
+                        {'id':0, 'name':'Mgr1', 'processes': [
+                            {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                            {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                            ]
+                        },
+                        {'id':1, 'name':'Mgr2', 'processes': [
+                            {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                            {'id':3, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                            ]
+                        },
                         ]
-                    },
-                    {'id':1, 'name':'Mgr2', 'processes': [
-                        {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                        {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                        ]
-                    },
-                    ]
+            }
         }
             ]
     init_data_s = json.dumps(init_data, separators=(',',':'))
@@ -72,7 +75,6 @@ def websocket_handler(websocket, path):
 
 
 
-import json
 
 @asyncio.coroutine
 def generate_content_cr():
@@ -87,16 +89,6 @@ def generate_content_cr():
     socket = context.socket(zmq.PAIR)
     socket.bind("tcp://*:%s" % port)
 
-    #yield from socket.send(init_data_s)
-
-
-    #with websockets_lock:
-    #    print ("Sending content..")
-    #    print ("NWebsockets: %d" % len(websockets))
-    #    for websocket in websockets:
-
-    #        if websocket.open:
-    #            yield from websocket.send(init_data_s)
 
     while(1):
         time.sleep(1)
@@ -107,13 +99,18 @@ def generate_content_cr():
         stdout_data = socket.recv()
         send_data = str(stdout_data) 
 
+        std_pkt = [ {'output': {'process_id':2, 'contents':send_data}}]
+        std_pkt_json = json.dumps(std_pkt)
+
+
         with websockets_lock:
             print ("Sending content..")
             print ("NWebsockets: %d" % len(websockets))
             for websocket in websockets:
 
                 if websocket.open:
-                    yield from websocket.send(send_data)
+                    #yield from websocket.send(send_data)
+                    yield from websocket.send(std_pkt_json)
 
 
 def generate_content_thread():
