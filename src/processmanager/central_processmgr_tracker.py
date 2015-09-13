@@ -4,7 +4,7 @@
 import zmq
 import sys
 
-
+import random
 import logging
 logger = logging.getLogger('websockets.server')
 logger.setLevel(logging.ERROR)
@@ -30,6 +30,7 @@ def websocket_handler(websocket, path):
 
     init_data = [
             {
+            'msg-type':'config',
             'config':{
                 'process_mgrs': [
                         {'id':0, 'name':'Mgr1', 'processes': [
@@ -37,11 +38,11 @@ def websocket_handler(websocket, path):
                             {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
                             ]
                         },
-                        {'id':1, 'name':'Mgr2', 'processes': [
-                            {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                            {'id':3, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                            ]
-                        },
+                        #{'id':1, 'name':'Mgr2', 'processes': [
+                        #    {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                        #    {'id':3, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                        #    ]
+                        #},
                         ]
             }
         }
@@ -99,7 +100,10 @@ def generate_content_cr():
         stdout_data = socket.recv()
         send_data = str(stdout_data) 
 
-        std_pkt = [ {'output': {'process_id':2, 'contents':send_data}}]
+        pipe = random.choice(['stderr','stdout'])
+        proc_id = random.randint(0,1) 
+
+        std_pkt = [ {'msg-type':'output','process_id':proc_id, 'pipe':pipe, 'contents':send_data}]
         std_pkt_json = json.dumps(std_pkt)
 
 

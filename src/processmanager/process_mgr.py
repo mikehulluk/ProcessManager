@@ -10,7 +10,7 @@ socket = context.socket(zmq.PAIR)
 socket.connect("tcp://localhost:%s" % port)
 
 while True:
-    time.sleep(1)
+    time.sleep(0.2)
     #msg = socket.recv()
     print("Sending mgs")
     t = datetime.datetime.now().strftime("%H:%M:%S  on %B %d, %Y")
