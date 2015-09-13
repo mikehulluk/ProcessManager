@@ -23,7 +23,7 @@ def br():
     with open('page.html.tmpl') as ftmpl:
         with open('brython_page.py') as f:
             tmpl = string.Template( ftmpl.read() )
-            return tmpl.substitute(brython_script=f)
+            return tmpl.substitute(brython_script=f.read())
 
 
 if __name__ == '__main__':
