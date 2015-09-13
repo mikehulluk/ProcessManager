@@ -100,10 +100,12 @@ def generate_content_cr():
 
     while(1):
         time.sleep(1)
-        send_data = "GENERATED_CONTENT"
-        send_data = "GENERATED_CONTENT"
-        send_data = socket.recv()
-        send_data = str(send_data) #socket.recv()
+
+        #send_data = "GENERATED_CONTENT"
+        #send_data = "GENERATED_CONTENT"
+
+        stdout_data = socket.recv()
+        send_data = str(stdout_data) 
 
         with websockets_lock:
             print ("Sending content..")
