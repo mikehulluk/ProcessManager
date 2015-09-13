@@ -11,7 +11,8 @@ def on_message(evt):
     # message reeived from server
     #alert("Message received : %s" %evt.data)
     div = doc['outputwindow']
-    div <= BR() + evt.data
+    code= doc['outputcode']
+    code <= BR() + evt.data
     div.scrollTop = div.scrollHeight;
     #doc['outputwindow'] = evt.data + BR() + doc['outputwindow']
 
