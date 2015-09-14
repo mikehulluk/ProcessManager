@@ -109,7 +109,7 @@ def handle_msg_config(msg):
             process_id = process['id']
 
             heading = DIV("[%s] %s (%d)"%(process_mgr_name, process_name, process_id), Class="panel-heading")
-            contents = H2(process_name)
+            contents = ""#H2(process_name)
             new_div = DIV(heading + DIV(contents, Class="panel-body"), Class="panel panel-default" )   
             ctn <= new_div
 
@@ -132,8 +132,6 @@ def handle_msg_output(msg):
     codeBlock = code_blks[ (proc_id,pipe_name) ]
     codeBlock <= BR() + msg['contents']
     codeBlock.parentNode.scrollTop = codeBlock.parentNode.scrollHeight;
-    #if msg_type=='output':
-    #        handle_msg_output(msg)
 
 
 doc['btn_connect'].bind('click', btnClkConnect)

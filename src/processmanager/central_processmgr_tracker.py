@@ -92,7 +92,7 @@ def generate_content_cr():
 
 
     while(1):
-        time.sleep(1)
+        #time.sleep(1)
 
         #send_data = "GENERATED_CONTENT"
         #send_data = "GENERATED_CONTENT"
