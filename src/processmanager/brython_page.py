@@ -135,3 +135,5 @@ def handle_msg_output(msg):
 
 
 doc['btn_connect'].bind('click', btnClkConnect)
+
+doc['outputwindow'].resizable()
