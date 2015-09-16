@@ -86,11 +86,7 @@ def handle_msg(data):
         if msg_type == 'cfg-process-mgr-details':
             handle_msg_cfg_process_mgr_details(msg)
 
-
-        if msg_type=='config':
-            handle_msg_config(msg)
         if msg_type=='output':
-            return
             handle_msg_output(msg)
 
 
@@ -138,11 +134,11 @@ def handle_msg_config_process_mgr_list(msg):
 
 def handle_msg_cfg_process_mgr_details(msg):
     global code_blks
-    
+
     print("Setting process mgr")
     print(msg)
     process_mgr_name = msg['name']
-    
+
     # Clear out the old contents from process_container:
     ctn = doc['ctn_process']
     code_blks = {}
@@ -165,47 +161,12 @@ def handle_msg_cfg_process_mgr_details(msg):
             new_div <= H3(output_pipe, )
             new_div <= container
             code_blks[ (process_id, output_pipe) ] = nCode
-    
+
 
 
 
 # Map (process_id, pipe_name) => code-html node
 code_blks = {}
-def handle_msg_config(msg):
-    global code_blks
-
-    config = msg['config']
-
-    # Clear out the old contents from process_container:
-    ctn = doc['ctn_process']
-    code_blks = {}
-    ctn.clear()
-
-
-
-    for process_mgr in config['process_mgrs']:
-        print("Process Mgr")
-        print(process_mgr)
-        process_mgr_name = process_mgr['name']
-
-        for process in process_mgr['processes']:
-            process_name = process['name']
-            process_id = process['id']
-
-            heading = DIV("[%s] %s (%d)"%(process_mgr_name, process_name, process_id), Class="panel-heading")
-            contents = ""#H2(process_name)
-            new_div = DIV(heading + DIV(contents, Class="panel-body"), Class="panel panel-default" )
-            ctn <= new_div
-
-            for output_pipe in process['outpipes']:
-                print ("output_pipe",output_pipe)
-                nCode = CODE("XX",id="jlk")
-                container = DIV( DIV( nCode,style={'overflow':'scroll','height':'150px'}),
-                            Class='container')
-                new_div <= H3(output_pipe, )
-                new_div <= container
-                code_blks[ (process_id, output_pipe) ] = nCode
-
 
 def handle_msg_output(msg):
     global code_blks
@@ -213,11 +174,11 @@ def handle_msg_output(msg):
     proc_id = msg['process_id']
     pipe_name = msg['pipe']
 
-    codeBlock = code_blks[ (proc_id,pipe_name) ]
-    codeBlock <= BR() + msg['contents']
-    codeBlock.parentNode.scrollTop = codeBlock.parentNode.scrollHeight;
+    codeBlock = code_blks.get((proc_id,pipe_name),None)
+    if codeBlock:
+        codeBlock <= BR() + msg['contents']
+        codeBlock.parentNode.scrollTop = codeBlock.parentNode.scrollHeight;
 
 
 doc['btn_connect'].bind('click', btnClkConnect)
 
-#doc['outputwindow'].resizable()
