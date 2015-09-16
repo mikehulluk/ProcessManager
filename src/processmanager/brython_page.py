@@ -138,6 +138,7 @@ def handle_msg_cfg_process_mgr_details(msg):
     print("Setting process mgr")
     print(msg)
     process_mgr_name = msg['name']
+    doc["procmgrdropbox"].text = process_mgr_name
 
     # Clear out the old contents from process_container:
     ctn = doc['ctn_process']

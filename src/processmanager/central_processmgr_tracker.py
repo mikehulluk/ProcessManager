@@ -97,14 +97,20 @@ def websocket_handler(websocket, path):
     yield from websocket.send(init_data_s)
 
 
-    time.sleep(5)
-
-
     name = yield from websocket.recv()
-    print("< {}".format(name))
-    greeting = "Hello - round2 {}!".format(name)
-    yield from websocket.send(greeting)
-    print("> {} (round2)".format(greeting))
+    time.sleep(5)
+    while True:
+        name = yield from websocket.recv()
+        if name:
+            print(name)
+
+
+
+    #name = yield from websocket.recv()
+    #print("< {}".format(name))
+    #greeting = "Hello - round2 {}!".format(name)
+    #yield from websocket.send(greeting)
+    #print("> {} (round2)".format(greeting))
 
     # Remove the websocket:
     with websockets_lock:
