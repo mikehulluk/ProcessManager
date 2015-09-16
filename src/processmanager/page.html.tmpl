@@ -83,14 +83,24 @@ ${brython_script}
 
   <!-- Tab panes -->
   <div class="tab-content">
-    <div role="tabpanel" class="tab-pane active" id="processes"> Tab1
+    <div role="tabpanel" class="tab-pane active" id="processes">
+        <div id="ctn_process" class="container"> </div>
     </div>
     <div role="tabpanel" class="tab-pane" id="profile">Tab2
     </div>
     <div role="tabpanel" class="tab-pane" id="messages">Tab3
     </div>
+
     <div role="tabpanel" class="tab-pane" id="debug">Tab4
+        <div class="container">
+            <div  id='outputwindow' style="overflow:scroll; height:250px;">
+            <code  id='outputcode'>
+            <br/> Sample output
+            </code>
+            </div>
+        </div>
     </div>
+    
   </div>
 
 </div>
@@ -103,28 +113,10 @@ ${brython_script}
 
 
 
-<div id="ctn_process" class="container">
-    <div class="panel panel-default">
-      <div class="panel-body">
-        Basic panel example
-      </div>
-    </div>
-    <div class="panel panel-default">
-      <div class="panel-body">
-        Basic panel example
-      </div>
-    </div>
-</div>
 
 
 
-    <div class="container">
-        <div  id='outputwindow' style="overflow:scroll; height:250px;">
-        <code  id='outputcode'>
-        <br/> Sample output
-        </code>
-        </div>
-    </div>
+
 
 
     <!-- 
