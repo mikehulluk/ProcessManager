@@ -47,6 +47,19 @@ def websocket_handler(websocket, path):
             }
         }
             ]
+
+    init_data = [
+            {
+            'msg-type':'cfg-process-mgr-list',
+            'process_mgrs': [
+                {'id':0, 'name':'Mgr1'},
+                {'id':1, 'name':'Mgr2'},
+                {'id':2, 'name':'Mgr2'},
+            ]
+            }
+            ]
+
+
     init_data_s = json.dumps(init_data, separators=(',',':'))
     yield from websocket.send(init_data_s)
 
@@ -54,14 +67,38 @@ def websocket_handler(websocket, path):
     with websockets_lock:
         websockets.append(websocket)
 
-    print ("Connection openned")
-    name = yield from websocket.recv()
-    print("< {}".format(name))
-    greeting = "Hello {}!".format(name)
-    yield from websocket.send(greeting)
-    print("> {}".format(greeting))
+    #time.sleep(10)
 
-    websocket.send("JLKJ")
+    #print ("Connection openned")
+    #name = yield from websocket.recv()
+    #print("< {}".format(name))
+    #greeting = "Hello {}!".format(name)
+    #yield from websocket.send(greeting)
+    #print("> {}".format(greeting))
+    
+    name = yield from websocket.recv()
+    print ("Data in!! %s", name)
+
+    time.sleep(5)
+
+    init_data = [
+            {
+            'msg-type':'cfg-process-mgr-details',
+            'id':0, 
+            'name':'Mgr1', 
+            'processes': [
+                            {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                            {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                            ]
+                        },
+            ]
+    init_data_s = json.dumps(init_data, separators=(',',':'))
+    print("Sending cfg-process-mgr-details")
+    yield from websocket.send(init_data_s)
+
+
+    time.sleep(5)
+
 
     name = yield from websocket.recv()
     print("< {}".format(name))
@@ -96,6 +133,7 @@ def generate_content_cr():
 
         #send_data = "GENERATED_CONTENT"
         #send_data = "GENERATED_CONTENT"
+        time.sleep(10)
 
         stdout_data = socket.recv()
         send_data = str(stdout_data) 

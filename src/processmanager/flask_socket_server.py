@@ -8,6 +8,7 @@ app = Flask(__name__, static_url_path='')
 
 
 pkg_root = "/home/mike/dev/ProcessManager/"
+pkg_root = "/home/michael/dev/ProcessManager/"
 @app.route('/js/<path:path>')
 def send_js(path):
     src_dir = pkg_root + "/www/js/"
