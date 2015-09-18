@@ -38,11 +38,6 @@ def websocket_handler(websocket, path):
                             {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
                             ]
                         },
-                        #{'id':1, 'name':'Mgr2', 'processes': [
-                        #    {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                        #    {'id':3, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                        #    ]
-                        #},
                         ]
             }
         }
