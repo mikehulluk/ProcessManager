@@ -27,12 +27,14 @@ logger.addHandler(logging.StreamHandler())
 
 
 
-websockets = []
+websockets = {}
 websockets_lock = Lock()
 
 
 
 
+
+# Keep a list of connected processes:
 connected_processes = {
     0: {'id':0, 'name':'Mgr1', 'processes': [
               {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
@@ -60,6 +62,8 @@ connected_processes = {
 @asyncio.coroutine
 def websocket_handler(websocket, path):
 
+    print("Connection openned")
+
 
     init_data = [
             {
@@ -74,7 +78,7 @@ def websocket_handler(websocket, path):
 
     # Add the websocket to the list:
     with websockets_lock:
-        websockets.append(websocket)
+        websockets[websocket] = None #.append(websocket)
 
 
     while 1:
@@ -83,6 +87,15 @@ def websocket_handler(websocket, path):
         msg_ins  = yield from websocket.recv()
         print ("Data in!! %s", msg_ins)
 
+        # Has the socket closed?
+        if msg_ins is None:
+            print("Socket closed. (By remote?)")
+            with websockets_lock:
+                del websockets[websocket]
+            return
+
+
+        # Otherwise, lets handle the data:
         msgs = json.loads(msg_ins)
 
         for msg in msgs:
@@ -102,14 +115,15 @@ def websocket_handler(websocket, path):
                 print(return_msg)
                 yield from websocket.send(init_data_s)
 
+                # And store which process_mgr the websocket is interested in:
+                with websockets_lock:
+                    websockets[websocket] = mgr_id
+
             else:
                 print ("Unhandled msg-type: %s" % msg_type)
 
 
 
-    # Remove the websocket:
-    with websockets_lock:
-        websockets.remove(websocket)
 
 
 
@@ -149,7 +163,7 @@ def generate_content_cr():
         with websockets_lock:
             print ("Sending content..")
             print ("NWebsockets: %d" % len(websockets))
-            for websocket in websockets:
+            for (websocket, procmgr_id) in websockets.items():
 
                 if websocket.open:
                     #yield from websocket.send(send_data)
