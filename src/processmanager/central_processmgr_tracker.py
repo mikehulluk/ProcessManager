@@ -6,9 +6,6 @@ import sys
 
 import random
 import logging
-logger = logging.getLogger('websockets.server')
-logger.setLevel(logging.ERROR)
-logger.addHandler(logging.StreamHandler())
 
 
 import asyncio
@@ -20,37 +17,54 @@ import time
 
 import json
 
+
+
+# Be verbose with the logging:
+logger = logging.getLogger('websockets.server')
+logger.setLevel(logging.ERROR)
+logger.addHandler(logging.StreamHandler())
+
+
+
+
 websockets = []
 websockets_lock = Lock()
+
+
+
+
+connected_processes = {
+    0: {'id':0, 'name':'Mgr1', 'processes': [
+              {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
+              {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                    ]
+            },
+
+    1: {'id':1, 'name':'Mgr2', 'processes': [
+              {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
+                    ]
+            },
+
+    2: {'id':2, 'name':'Mgr3', 'processes': [
+              {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
+              {'id':1, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
+              {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
+                    ]
+            },
+
+}
+
 
 
 
 @asyncio.coroutine
 def websocket_handler(websocket, path):
 
-    init_data = [
-            {
-            'msg-type':'config',
-            'config':{
-                'process_mgrs': [
-                        {'id':0, 'name':'Mgr1', 'processes': [
-                            {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                            {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                            ]
-                        },
-                        ]
-            }
-        }
-            ]
 
     init_data = [
             {
             'msg-type':'cfg-process-mgr-list',
-            'process_mgrs': [
-                {'id':0, 'name':'Mgr1'},
-                {'id':1, 'name':'Mgr2'},
-                {'id':2, 'name':'Mgr2'},
-            ]
+            'process_mgrs': list( connected_processes.values() )
             }
             ]
 
@@ -62,50 +76,36 @@ def websocket_handler(websocket, path):
     with websockets_lock:
         websockets.append(websocket)
 
-    #time.sleep(10)
 
-    #print ("Connection openned")
-    #name = yield from websocket.recv()
-    #print("< {}".format(name))
-    #greeting = "Hello {}!".format(name)
-    #yield from websocket.send(greeting)
-    #print("> {}".format(greeting))
-    
-    name = yield from websocket.recv()
-    print ("Data in!! %s", name)
-
-    time.sleep(5)
-
-    init_data = [
-            {
-            'msg-type':'cfg-process-mgr-details',
-            'id':0, 
-            'name':'Mgr1', 
-            'processes': [
-                            {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                            {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
-                            ]
-                        },
-            ]
-    init_data_s = json.dumps(init_data, separators=(',',':'))
-    print("Sending cfg-process-mgr-details")
-    yield from websocket.send(init_data_s)
+    while 1:
 
 
-    name = yield from websocket.recv()
-    time.sleep(5)
-    while True:
-        name = yield from websocket.recv()
-        if name:
-            print(name)
+        msg_ins  = yield from websocket.recv()
+        print ("Data in!! %s", msg_ins)
+
+        msgs = json.loads(msg_ins)
+
+        for msg in msgs:
+            msg_type = msg['msg-type']
+
+            if msg_type=="set-process-mgr":
+
+                mgr_id = int( msg['process-mgr-id'] )
+                process_mgr_data = connected_processes[mgr_id]
+
+                return_msg = {'msg-type': 'cfg-process-mgr-details'}
+                return_msg.update(process_mgr_data)
 
 
+                init_data_s = json.dumps([return_msg], separators=(',',':'))
+                print("Sending cfg-process-mgr-details")
+                print(return_msg)
+                yield from websocket.send(init_data_s)
 
-    #name = yield from websocket.recv()
-    #print("< {}".format(name))
-    #greeting = "Hello - round2 {}!".format(name)
-    #yield from websocket.send(greeting)
-    #print("> {} (round2)".format(greeting))
+            else:
+                print ("Unhandled msg-type: %s" % msg_type)
+
+
 
     # Remove the websocket:
     with websockets_lock:
@@ -134,13 +134,13 @@ def generate_content_cr():
 
         #send_data = "GENERATED_CONTENT"
         #send_data = "GENERATED_CONTENT"
-        time.sleep(10)
+        time.sleep(1)
 
         stdout_data = socket.recv()
-        send_data = str(stdout_data) 
+        send_data = str(stdout_data)
 
         pipe = random.choice(['stderr','stdout'])
-        proc_id = random.randint(0,1) 
+        proc_id = random.randint(0,1)
 
         std_pkt = [ {'msg-type':'output','process_id':proc_id, 'pipe':pipe, 'contents':send_data}]
         std_pkt_json = json.dumps(std_pkt)

@@ -2,7 +2,7 @@ from browser import alert, document as doc
 from browser import websocket
 from browser.html import BR, DIV, H2, H3,H4, CODE, LI,A
 import json
-
+import functools
 
 
 def on_open(evt):
@@ -123,7 +123,9 @@ def handle_msg_config_process_mgr_list(msg):
     for process_mgr in msg['process_mgrs']:
         print(process_mgr)
         newNode = A(process_mgr['name'])
-        newNode.bind('click', lambda evt :switch_to_new_process_mgr(evt=evt,id_=process_mgr['id']) )
+        id_ = process_mgr['id']
+        #newNode.bind('click', lambda evt :switch_to_new_process_mgr(evt=evt,id_=id_) )
+        newNode.bind('click', functools.partial(switch_to_new_process_mgr, id_=id_)  )
         dropListNode <= LI(newNode)
 
     # And switch to the first node by default:
