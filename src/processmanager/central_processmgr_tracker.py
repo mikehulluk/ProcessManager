@@ -43,14 +43,14 @@ connected_processes = {
             },
 
     1: {'id':1, 'name':'Mgr2', 'processes': [
-              {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
+              {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
                     ]
             },
 
     2: {'id':2, 'name':'Mgr3', 'processes': [
-              {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
-              {'id':1, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
-              {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
+              {'id':4, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
+              {'id':5, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
+              {'id':6, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
                     ]
             },
 
@@ -148,26 +148,35 @@ def generate_content_cr():
 
         #send_data = "GENERATED_CONTENT"
         #send_data = "GENERATED_CONTENT"
-        time.sleep(1)
+        #time.sleep(1)
 
         stdout_data = socket.recv()
         send_data = str(stdout_data)
 
-        pipe = random.choice(['stderr','stdout'])
-        proc_id = random.randint(0,1)
+        procmgr_id = random.choice( list(connected_processes.keys() ) )
+        process = random.choice( list( connected_processes[procmgr_id]['processes'] ) )
+        pipe = random.choice( list( process['outpipes'] ) )
 
-        std_pkt = [ {'msg-type':'output','process_id':proc_id, 'pipe':pipe, 'contents':send_data}]
+
+        #pipe = random.choice(['stderr','stdout'])
+        #proc_id = random.randint(0,1)
+
+        std_pkt = [ {'msg-type':'output','process_id':process['id'], 'pipe':pipe, 'contents':send_data}]
         std_pkt_json = json.dumps(std_pkt)
 
 
         with websockets_lock:
             print ("Sending content..")
             print ("NWebsockets: %d" % len(websockets))
-            for (websocket, procmgr_id) in websockets.items():
+            for (websocket, ws_procmgr_id) in websockets.items():
+                if procmgr_id != ws_procmgr_id:
+                    continue
 
                 if websocket.open:
                     #yield from websocket.send(send_data)
                     yield from websocket.send(std_pkt_json)
+
+
 
 
 def generate_content_thread():
@@ -186,12 +195,26 @@ tr.start()
 
 
 
-# And launch the websockets server:
+
+def websockets_thread():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    start_server = ws.serve(websocket_handler, 'localhost', 8765)
+    asyncio.get_event_loop().run_until_complete(start_server)
+    asyncio.get_event_loop().run_forever()
+
+
+
+# And launch the websockets server in a new thread::
 print ("Launching server:")
-start_server = ws.serve(websocket_handler, 'localhost', 8765)
-asyncio.get_event_loop().run_until_complete(start_server)
-asyncio.get_event_loop().run_forever()
+tr_websockets = Thread(target=websockets_thread)
+tr_websockets.start()
 
 
-
-
+try:
+    tr.join()
+    tr_websockets.join()
+except:
+    print( "Exception Raise")
+    print( "TODO:: KILL THREADS")
+    raise
