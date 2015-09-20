@@ -16,6 +16,11 @@ from threading import Thread, Lock
 import time
 
 import json
+import socket
+import socketserver
+import threading
+import socketserver
+import time
 
 
 
@@ -151,6 +156,7 @@ def generate_content_cr():
         #time.sleep(1)
 
         stdout_data = socket.recv()
+
         send_data = str(stdout_data)
 
         procmgr_id = random.choice( list(connected_processes.keys() ) )
@@ -191,6 +197,8 @@ def generate_content_thread():
 # Spawn off the thread to take of reading input and forwarding it up to the web-sockets:
 print ("Started thread")
 tr = Thread(target=generate_content_thread, )
+# (Starting as a daemon means the thread will not prevent the process from exiting.)
+tr.daemon = True
 tr.start()
 
 
@@ -206,9 +214,72 @@ def websockets_thread():
 
 
 # And launch the websockets server in a new thread::
-print ("Launching server:")
+print ("Launching websockets server:")
 tr_websockets = Thread(target=websockets_thread)
+# (Starting as a daemon means the thread will not prevent the process from exiting.)
 tr_websockets.start()
+
+
+
+
+
+class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
+
+
+    def handle(self):
+
+        # Msgs are "SIZE:PORT:CONTENTS"
+        print ("Waiting for msg...")
+        msg_size = self.rfile.readline()
+        msg_size = int(msg_size) 
+        print ("Read SIZE: %s" % msg_size)
+        msg_subport = self.rfile.readline()
+        print ("Read SUBPORT: %s" % msg_subport)
+
+        buff = b''
+        while len(buff) < msg_size:
+            x = self.rfile.read(1024)
+            if x is 0:
+                raise RuntimeError('Connection closed')
+            buff += x
+
+        print ('Msg read OK: %d' % len(buff))
+        self.handleMsg( subport=int(msg_subport.decode('utf-8').strip() ), msg=buff)
+
+    def finish(self):
+        print ("Closing up socket")
+
+    def handleMsg(self, subport, msg):
+        print ('Handling Message Port:%d Length:%d' %(subport, len(msg)) )
+
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    pass
+
+
+
+def build_tcpserver():
+    # Port 0 means to select an arbitrary unused port
+    HOST, PORT = "localhost", 6000
+
+    server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
+    ip, port = server.server_address
+
+    # Start a thread with the server -- that thread will then start one
+    # more thread for each request
+    server_thread = threading.Thread(target=server.serve_forever)
+    # Exit the server thread when the main thread terminates
+    server_thread.daemon = True
+    server_thread.start()
+
+    #server.serve_forever()
+
+
+print ("Launching tcp server:")
+tr_tcp = Thread(target=build_tcpserver)
+# (Starting as a daemon means the thread will not prevent the process from exiting.)
+tr_tcp.start()
+
+
 
 
 try:
