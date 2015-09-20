@@ -227,30 +227,38 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
 
     def handle(self):
+        while True:
+            # Msgs are "SIZE:PORT:CONTENTS"
+            print ("Waiting for msg...")
+            msg_size = self.rfile.readline()
+            if not msg_size:
+                return
+            msg_size = int(msg_size) 
+            print ("Read SIZE: %s" % msg_size)
+            msg_subport = self.rfile.readline()
+            if not msg_subport:
+                return
+            print ("Read SUBPORT: %s" % msg_subport)
 
-        # Msgs are "SIZE:PORT:CONTENTS"
-        print ("Waiting for msg...")
-        msg_size = self.rfile.readline()
-        msg_size = int(msg_size) 
-        print ("Read SIZE: %s" % msg_size)
-        msg_subport = self.rfile.readline()
-        print ("Read SUBPORT: %s" % msg_subport)
+            buff = b''
+            while len(buff) < msg_size:
+                to_read = msg_size - len(buff)
+                x = self.rfile.read(to_read)
+                if not x:
+                    print( 'Connection closed')
+                    return
+                buff += x
 
-        buff = b''
-        while len(buff) < msg_size:
-            x = self.rfile.read(1024)
-            if x is 0:
-                raise RuntimeError('Connection closed')
-            buff += x
-
-        print ('Msg read OK: %d' % len(buff))
-        self.handleMsg( subport=int(msg_subport.decode('utf-8').strip() ), msg=buff)
+            print ('Msg read OK: %d' % len(buff))
+            self.handleMsg( subport=int(msg_subport.decode('utf-8').strip() ), msg=buff)
 
     def finish(self):
         print ("Closing up socket")
 
     def handleMsg(self, subport, msg):
         print ('Handling Message Port:%d Length:%d' %(subport, len(msg)) )
+        print (msg)
+        print ('\n')
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     pass
