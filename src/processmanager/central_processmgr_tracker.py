@@ -12,7 +12,7 @@ import asyncio
 import websockets as ws
 
 import multiprocessing
-from threading import Thread, Lock
+from threading import Thread, Lock, local
 import time
 
 import json
@@ -42,20 +42,20 @@ websockets_lock = Lock()
 # Keep a list of connected processes:
 connected_processes = {
     0: {'id':0, 'name':'Mgr1', 'processes': [
-              {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
-              {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':['stdout','stderr']  },
+        {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':{1: 'stdout', 2:'stderr'}  },
+        {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':{3: 'stdout', 4:'stderr'}  },
                     ]
             },
 
     1: {'id':1, 'name':'Mgr2', 'processes': [
-              {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':['stdout','stderr']  },
+        {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':{1:'stdout',2:'stderr'}  },
                     ]
             },
 
     2: {'id':2, 'name':'Mgr3', 'processes': [
-              {'id':4, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
-              {'id':5, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
-              {'id':6, 'name':'Process1', 'start_time':None, 'outpipes':['stdout-stderr']  },
+        {'id':4, 'name':'Process1', 'start_time':None, 'outpipes':{1:'stdout-stderr'}  },
+        {'id':5, 'name':'Process1', 'start_time':None, 'outpipes':{2:'stdout-stderr'}  },
+        {'id':6, 'name':'Process1', 'start_time':None, 'outpipes':{3:'stdout-stderr'}  },
                     ]
             },
 
@@ -64,20 +64,21 @@ connected_processes = {
 
 class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
-
     def handle(self):
+
+        self.procmgr_id = None
+
         while True:
             # Msgs are "SIZE:PORT:CONTENTS"
             print ("Waiting for msg...")
+
             msg_size = self.rfile.readline()
             if not msg_size:
                 return
-            msg_size = int(msg_size) 
-            #print ("Read SIZE: %s" % msg_size)
+            msg_size = int(msg_size)
             msg_subport = self.rfile.readline()
             if not msg_subport:
                 return
-            #print ("Read SUBPORT: %s" % msg_subport)
 
             buff = b''
             while len(buff) < msg_size:
@@ -89,7 +90,7 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
                 buff += x
 
             #print ('Msg read OK: %d' % len(buff))
-            self.handleMsg( subport=int(msg_subport.decode('utf-8').strip() ), msg=buff)
+            self.handleMsg( subport=int(msg_subport.decode('utf-8').strip() ), msg=buff.decode('utf-8') )
 
     def finish(self):
         print ("Closing up socket")
@@ -98,6 +99,43 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         print ('Handling Message Port:%d Length:%d' %(subport, len(msg)) )
         print (msg)
         print ('\n')
+
+        if subport == 0:
+            print("Hooking in!")
+            msg = json.loads(msg)
+            print (msg)
+
+            with websockets_lock:
+
+                # Add the ids:
+
+                self.procmgr_id =   max( [ mgr['id'] for mgr in connected_processes.values() ]) + 1
+                next_proc_id = max( [ proc['id']  for mgr in connected_processes.values() for proc in mgr['processes'] ]) + 1
+
+                msg['id'] = self.procmgr_id
+                for (i,process) in enumerate(msg['processes']):
+                    process['id'] = next_proc_id + i
+
+                # Add to the list:
+                connected_processes[self.procmgr_id] = msg
+                pp.pprint(connected_processes)
+                print("Connected to %d" % len(connected_processes) )
+
+
+        else:
+            # Lookup the port:
+            with websockets_lock:
+                pipe_name = None
+                for proc in connected_processes[self.procmgr_id]['processes']:
+                    if subport in proc['outpipes']:
+                        pipe_name = proc['outpipes'][subport]
+                        break
+                print("Subport: %s" %subport)
+
+                assert(pipe_name)
+                print ("Fpund pipename: %s", pipe_name)
+
+            pass
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     pass
@@ -144,7 +182,7 @@ tr_tcp.start()
 
 
 
-
+import pprint as pp
 
 @asyncio.coroutine
 def websocket_handler(websocket, path):
@@ -158,6 +196,8 @@ def websocket_handler(websocket, path):
             'process_mgrs': list( connected_processes.values() )
             }
             ]
+
+    pp.pprint(connected_processes)
 
 
     init_data_s = json.dumps(init_data, separators=(',',':'))

@@ -156,7 +156,7 @@ def handle_msg_cfg_process_mgr_details(msg):
         new_div = DIV(heading + DIV(contents, Class="panel-body"), Class="panel panel-default" )
         ctn <= new_div
 
-        for output_pipe in process['outpipes']:
+        for output_pipe in process['outpipes'].values():
             print ("output_pipe",output_pipe)
             nCode = CODE("XX",id="jlk")
             container = DIV( DIV( nCode,style={'overflow':'scroll','height':'150px'}),

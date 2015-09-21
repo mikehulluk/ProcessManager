@@ -6,6 +6,8 @@ import socketserver
 import time
 
 import json
+import functools
+from threading import Thread
 
 
 def send_msg( sock, subport, message):
@@ -30,12 +32,12 @@ def client(message, ip, port):
         send_msg(sock=sock, subport=0, message=json.dumps(msg) )
 
         for i in range(10):
-            print ("Sending: %s" % msg)
+            time.sleep(50)
+            print ("Sending: %s" % message)
             send_msg(sock=sock, subport=1, message="ProcA - StdOut1")
             send_msg(sock=sock, subport=2, message="ProcA - StdErr1")
             send_msg(sock=sock, subport=3, message="ProbB - StdOut2")
             send_msg(sock=sock, subport=4, message="ProcB - StdErr2")
-            time.sleep(5)
 
 
     finally:
@@ -47,8 +49,6 @@ def client(message, ip, port):
 
 
 
-import functools
-from threading import Thread, Lock
 
 
 if __name__ == "__main__":
