@@ -89,13 +89,13 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
                     return
                 buff += x
 
-            #print ('Msg read OK: %d' % len(buff))
-            self.handleMsg( subport=int(msg_subport.decode('utf-8').strip() ), msg=buff.decode('utf-8') )
+            print ('Msg read OK: %d' % len(buff))
+            self.handleMsgX( subport=int(msg_subport.decode('utf-8').strip() ), msg=buff.decode('utf-8') )
+            print ("Handled OK!\n")
 
-    def finish(self):
-        print ("Closing up socket")
 
-    def handleMsg(self, subport, msg):
+
+    def handleMsgX(self, subport, msg):
         print ('Handling Message Port:%d Length:%d' %(subport, len(msg)) )
         print (msg)
         print ('\n')
@@ -123,19 +123,45 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
 
         else:
+            subport_str = str(subport)
             # Lookup the port:
             with websockets_lock:
                 pipe_name = None
                 for proc in connected_processes[self.procmgr_id]['processes']:
-                    if subport in proc['outpipes']:
-                        pipe_name = proc['outpipes'][subport]
+                    print (proc['outpipes'])
+                    if subport_str in proc['outpipes']:
+                        pipe_name = proc['outpipes'][subport_str]
                         break
-                print("Subport: %s" %subport)
+                print("Subport_str: %s" %subport_str)
+                print("Pipename: %s" %pipe_name)
 
                 assert(pipe_name)
                 print ("Fpund pipename: %s", pipe_name)
 
-            pass
+
+                # Ok, we can now send out a packet to each websocket:
+                std_pkt = [ {'msg-type':'output','process_id':process['id'], 'pipe':pipe, 'contents':send_data}]
+                std_pkt_json = json.dumps(std_pkt)
+
+
+                with websockets_lock:
+                    print ("Sending content..")
+                    print ("NWebsockets: %d" % len(websockets))
+                    for (websocket, ws_procmgr_id) in websockets.items():
+                        if procmgr_id != ws_procmgr_id:
+                            continue
+
+                        if websocket.open:
+                            #yield from websocket.send(send_data)
+                            yield from websocket.send(std_pkt_json)
+
+    def finish(self):
+        print ("Closing up socket")
+        if not self.procmgr_id:
+            return
+        with websockets_lock:
+            del connected_processes[self.procmgr_id]
+
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     pass
@@ -144,7 +170,7 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 def build_tcpserver():
     # Port 0 means to select an arbitrary unused port
-    HOST, PORT = "localhost", 6003
+    HOST, PORT = "localhost", 6004
 
     server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
     ip, port = server.server_address

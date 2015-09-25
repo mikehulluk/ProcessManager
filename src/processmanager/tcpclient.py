@@ -32,7 +32,7 @@ def client(message, ip, port):
         send_msg(sock=sock, subport=0, message=json.dumps(msg) )
 
         for i in range(10):
-            time.sleep(50)
+            time.sleep(10)
             print ("Sending: %s" % message)
             send_msg(sock=sock, subport=1, message="ProcA - StdOut1")
             send_msg(sock=sock, subport=2, message="ProcA - StdErr1")
@@ -56,12 +56,12 @@ if __name__ == "__main__":
     #client('127.0.0.1', 6000, 1, "Hello World 1")
     #client('127.0.0.1', 6000, 2, "Hello World 1")
 
-    HOST, PORT = "localhost", 6003
+    HOST, PORT = "localhost", 6004
 
 
 
     f = functools.partial( client, ip=HOST, port=PORT)
-    trs = [Thread(target=f, args=["Mgr%d"%i]) for i in range(5)]
+    trs = [Thread(target=f, args=["Mgr%d"%i]) for i in range(7)]
     for tr in trs:
         tr.daemon=True
         tr.start()
