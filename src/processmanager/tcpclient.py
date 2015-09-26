@@ -33,8 +33,8 @@ def client(message, ip, port):
 
         send_msg(sock=sock, subport=0, message=json.dumps(msg) )
 
-        for i in range(10):
-            time.sleep(10)
+        for i in range(100):
+            time.sleep(1)
             print ("Sending: %s" % message)
             send_msg(sock=sock, subport=1, message="ProcA - StdOut1")
             send_msg(sock=sock, subport=2, message="ProcA - StdErr1")
@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
 
     f = functools.partial( client, ip=HOST, port=PORT)
-    trs = [Thread(target=f, args=["Mgr%d"%i]) for i in range(7)]
+    trs = [Thread(target=f, args=["Mgr%d"%i]) for i in range(2)]
     for tr in trs:
         tr.daemon=True
         tr.start()

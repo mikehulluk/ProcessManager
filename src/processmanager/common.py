@@ -2,4 +2,4 @@
 
 class Ports():
     Websocket = 8765
-    ProcessMgrs = 6006
+    ProcessMgrs = 6000

@@ -33,34 +33,35 @@ logger.addHandler(logging.StreamHandler())
 
 
 
-websockets = {}
 websockets_lock = Lock()
+websockets = {}
 
+connected_processes = {}
 
 
 
 
 # Keep a list of connected processes:
-connected_processes = {
-    0: {'id':0, 'name':'Mgr1', 'processes': [
-        {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':{1: 'stdout', 2:'stderr'}  },
-        {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':{3: 'stdout', 4:'stderr'}  },
-                    ]
-            },
-
-    1: {'id':1, 'name':'Mgr2', 'processes': [
-        {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':{1:'stdout',2:'stderr'}  },
-                    ]
-            },
-
-    2: {'id':2, 'name':'Mgr3', 'processes': [
-        {'id':4, 'name':'Process1', 'start_time':None, 'outpipes':{1:'stdout-stderr'}  },
-        {'id':5, 'name':'Process1', 'start_time':None, 'outpipes':{2:'stdout-stderr'}  },
-        {'id':6, 'name':'Process1', 'start_time':None, 'outpipes':{3:'stdout-stderr'}  },
-                    ]
-            },
-
-}
+#connected_processes = {
+#    0: {'id':0, 'name':'Mgr1', 'processes': [
+#        {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':{1: 'stdout', 2:'stderr'}  },
+#        {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':{3: 'stdout', 4:'stderr'}  },
+#                    ]
+#            },
+#
+#    1: {'id':1, 'name':'Mgr2', 'processes': [
+#        {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':{1:'stdout',2:'stderr'}  },
+#                    ]
+#            },
+#
+#    2: {'id':2, 'name':'Mgr3', 'processes': [
+#        {'id':4, 'name':'Process1', 'start_time':None, 'outpipes':{1:'stdout-stderr'}  },
+#        {'id':5, 'name':'Process1', 'start_time':None, 'outpipes':{2:'stdout-stderr'}  },
+#        {'id':6, 'name':'Process1', 'start_time':None, 'outpipes':{3:'stdout-stderr'}  },
+#                    ]
+#            },
+#
+#}
 
 
 class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
@@ -92,10 +93,18 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
             subport = int(msg_subport.decode('utf-8').strip() )
             msg = buff.decode('utf-8')
-            print ('Msg read OK: %d bytes over subport: %d' % ( len(msg), subport ) )
-            print(self.handleMsgMJHX)
+
+
+            print("Sending empty message to all websockets:")
+            for websocket in websockets:
+                print("  -- %s" % websocket)
+                websocket.send("[]")
+
+
+            #print ('Msg read OK: %d bytes over subport: %d' % ( len(msg), subport ) )
+            #print(self.handleMsgMJHX)
             self.handleMsgMJHX( subport=subport, msg=msg )
-            print ("Handled OK!\n")
+            #print ("Handled OK!\n")
 
 
 
@@ -113,8 +122,12 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
                 print("New Process Mgr Connected")
 
-                self.procmgr_id =   max( [ mgr['id'] for mgr in connected_processes.values() ]) + 1
-                next_proc_id = max( [ proc['id']  for mgr in connected_processes.values() for proc in mgr['processes'] ]) + 1
+                if connected_processes:
+                    self.procmgr_id =  max( [ mgr['id'] for mgr in connected_processes.values() ]) + 1
+                    next_proc_id = max( [ proc['id']  for mgr in connected_processes.values() for proc in mgr['processes'] ]) + 1
+                else:
+                    self.procmgr_id = 0
+                    next_proc_id = 0
 
                 msg['id'] = self.procmgr_id
                 for (i,process) in enumerate(msg['processes']):
@@ -127,21 +140,25 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
 
         else:
+            print("Forwarding message....")
             subport_str = str(subport)
             # Lookup the port:
             with websockets_lock:
                 process, pipe_name = None,None
                 for proc in connected_processes[self.procmgr_id]['processes']:
-                    print (proc['outpipes'])
+                    #print ("AA")
+                    #print (proc['outpipes'])
                     if subport_str in proc['outpipes']:
                         pipe_name = proc['outpipes'][subport_str]
                         process=proc
                         break
-                print("Subport_str: %s" %subport_str)
-                print("Pipename: %s" %pipe_name)
+                    #print ("BB")
+                #print("Subport_str: %s" %subport_str)
+                #print("Pipename: %s" %pipe_name)
 
                 assert(pipe_name)
-                print ("Fpund pipename: %s", pipe_name)
+                assert(proc)
+                #print ("Found pipename: %s", pipe_name)
 
 
                 # Ok, we can now send out a packet to each websocket:
@@ -149,17 +166,19 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
                 std_pkt_json = json.dumps(std_pkt)
 
 
-                with websockets_lock:
-                    print ("Sending content..")
-                    print ("NWebsockets: %d" % len(websockets))
-                    for (websocket, ws_procmgr_id) in websockets.items():
-                        print([procmgr_id, ws_procmgr_id])
-                        if procmgr_id != ws_procmgr_id:
-                            continue
+                #with websockets_lock:
+                #print ("Sending content..")
+                #print ("NWebsockets: %d" % len(websockets))
+                for (websocket, ws_procmgr_id) in websockets.items():
+                    #print([self.procmgr_id, ws_procmgr_id])
+                    if self.procmgr_id != ws_procmgr_id:
+                        continue
 
-                        if websocket.open:
-                            print("Forwarding message to websocket")
-                            websocket.send(std_pkt_json)
+                    if websocket.open:
+                        print("Forwarding to websocket....%d", (websocket))
+                        #assert(0)
+                        websocket.send(std_pkt_json)
+                        print("Sent...")
 
     def finish(self):
         print ("Closing up socket")
@@ -167,6 +186,8 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
             return
         with websockets_lock:
             del connected_processes[self.procmgr_id]
+
+
 
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
@@ -188,7 +209,6 @@ def build_tcpserver():
     server_thread.daemon = True
     server_thread.start()
 
-    #server.serve_forever()
 
 
 print ("Launching tcp server:")
@@ -220,6 +240,7 @@ tr_tcp.start()
 def websocket_handler(websocket, path):
 
     print("Connection openned")
+    #websocket.enableTrace(True)
 
 
     init_data = [
@@ -237,7 +258,7 @@ def websocket_handler(websocket, path):
 
     # Add the websocket to the list:
     with websockets_lock:
-        websockets[websocket] = None #.append(websocket)
+        websockets[websocket] = None
 
 
     while 1:
@@ -270,8 +291,6 @@ def websocket_handler(websocket, path):
 
 
                 init_data_s = json.dumps([return_msg], separators=(',',':'))
-                #print("Sending cfg-process-mgr-details")
-                #print(return_msg)
                 yield from websocket.send(init_data_s)
 
                 # And store which process_mgr the websocket is interested in:
@@ -285,75 +304,6 @@ def websocket_handler(websocket, path):
 
 
 
-
-
-
-#@asyncio.coroutine
-#def generate_content_cr():
-#    print ("Starting generate content:")
-#
-#    port = "5556"
-#    if len(sys.argv) > 1:
-#        port =  sys.argv[1]
-#        int(port)
-#
-#    context = zmq.Context()
-#    socket = context.socket(zmq.PAIR)
-#    socket.bind("tcp://*:%s" % port)
-#
-#
-#    while(1):
-#        #time.sleep(1)
-#
-#        #send_data = "GENERATED_CONTENT"
-#        #send_data = "GENERATED_CONTENT"
-#        #time.sleep(1)
-#
-#        stdout_data = socket.recv()
-#
-#        send_data = str(stdout_data)
-#
-#        procmgr_id = random.choice( list(connected_processes.keys() ) )
-#        process = random.choice( list( connected_processes[procmgr_id]['processes'] ) )
-#        pipe = random.choice( list( process['outpipes'] ) )
-#
-#
-#        #pipe = random.choice(['stderr','stdout'])
-#        #proc_id = random.randint(0,1)
-#
-#        std_pkt = [ {'msg-type':'output','process_id':process['id'], 'pipe':pipe, 'contents':send_data}]
-#        std_pkt_json = json.dumps(std_pkt)
-#
-#
-#        with websockets_lock:
-#            print ("Sending content..")
-#            print ("NWebsockets: %d" % len(websockets))
-#            for (websocket, ws_procmgr_id) in websockets.items():
-#                if procmgr_id != ws_procmgr_id:
-#                    continue
-#
-#                if websocket.open:
-#                    #yield from websocket.send(send_data)
-#                    yield from websocket.send(std_pkt_json)
-
-
-
-
-#def generate_content_thread():
-#    loop = asyncio.new_event_loop()
-#    asyncio.set_event_loop(loop)
-#    asyncio.get_event_loop().run_until_complete(generate_content_cr())
-#    asyncio.get_event_loop().run_forever()
-
-
-
-
-## Spawn off the thread to take of reading input and forwarding it up to the web-sockets:
-#print ("Started thread")
-#tr = Thread(target=generate_content_thread, )
-## (Starting as a daemon means the thread will not prevent the process from exiting.)
-#tr.daemon = True
-#tr.start()
 
 
 

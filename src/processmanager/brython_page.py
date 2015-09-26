@@ -26,6 +26,7 @@ def on_close(evt):
 
 
 def on_message(evt):
+    print("Message recv'ed")
     div = doc['outputwindow']
     code= doc['outputcode']
     code <= BR() + evt.data
