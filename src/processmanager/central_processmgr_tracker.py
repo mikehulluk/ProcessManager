@@ -87,15 +87,12 @@ def generate_content_cr():
             print ("Sending content..")
             print ("NWebsockets: %d" % len(websockets))
             for websocket in websockets:
-                pass
 
                 if websocket.open:
-                    #yield from websocket.send("[]")
                     for data in websocket_data[websocket]:
                         yield from websocket.send(data)
                     websocket_data[websocket] = []
 
-                    #websocket.send("[]")
 
 
 def generate_content_thread():
@@ -110,15 +107,8 @@ def generate_content_thread():
 print("Starting autogenerate thread")
 tr_autogen = Thread(target=generate_content_thread)
 # (Starting as a daemon means the thread will not prevent the process from exiting.)
-#tr_autogen.daemon = True
+tr_autogen.daemon = True
 tr_autogen.start()
-
-#print("Looping")
-#while(1):
-#    time.sleep(1)
-#
-#
-#print("jlkjl")
 
 
 
@@ -139,14 +129,7 @@ tr_autogen.start()
 
 class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
-    def handle(self):
-
-        self.procmgr_id = None
-
-        while True:
-            # Msgs are "SIZE:PORT:CONTENTS"
-            print ("Waiting for msg...")
-
+    def readMsg(self):
             msg_size = self.rfile.readline()
             if not msg_size:
                 return
@@ -154,7 +137,6 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
             msg_subport = self.rfile.readline()
             if not msg_subport:
                 return
-
             buff = b''
             while len(buff) < msg_size:
                 to_read = msg_size - len(buff)
@@ -166,20 +148,19 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
             subport = int(msg_subport.decode('utf-8').strip() )
             msg = buff.decode('utf-8')
+            return (subport,msg)
 
 
-            print("Sending empty message to all websockets:")
-            for websocket in websockets:
-                websocket_data[websocket].append("[]")
+    def handle(self):
 
-                print("  -- %s" % websocket)
-                #websocket.send("[]")
-            print("Empty messages sent")
+        self.procmgr_id = None
 
-            #print ('Msg read OK: %d bytes over subport: %d' % ( len(msg), subport ) )
-            #print(self.handleMsgMJHX)
+        while True:
+            r = self.readMsg()
+            if not r:
+                return
+            (subport,msg) = r
             self.handleMsgMJHX( subport=subport, msg=msg )
-            #print ("Handled OK!\n")
 
 
 
