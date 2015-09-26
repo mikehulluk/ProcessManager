@@ -9,6 +9,8 @@ import json
 import functools
 from threading import Thread
 
+import common
+
 
 def send_msg( sock, subport, message):
     msg_bytes = bytes(message, 'utf-8')
@@ -56,7 +58,7 @@ if __name__ == "__main__":
     #client('127.0.0.1', 6000, 1, "Hello World 1")
     #client('127.0.0.1', 6000, 2, "Hello World 1")
 
-    HOST, PORT = "localhost", 6004
+    HOST, PORT = "localhost", common.Ports.ProcessMgrs
 
 
 
