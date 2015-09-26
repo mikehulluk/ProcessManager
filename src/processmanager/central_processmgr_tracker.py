@@ -64,6 +64,73 @@ connected_processes = {}
 #}
 
 
+
+
+
+
+
+
+
+
+
+
+#  #@asyncio.coroutine
+#  def generate_content_cr():
+#      print ("Starting generate content:")
+#      sys.stdout.flush()
+#  
+#      while(1):
+#          time.sleep(1)
+#  
+#          with websockets_lock:
+#              print ("Sending content..")
+#              print ("NWebsockets: %d" % len(websockets))
+#              for websocket in websockets:
+#                  pass
+#  
+#                  #if websocket.open:
+#                  #    yield from websocket.send(send_data)
+#  
+#  
+#  def generate_content_thread():
+#      loop = asyncio.new_event_loop()
+#      asyncio.set_event_loop(loop)
+#      asyncio.get_event_loop().run_until_complete(generate_content_cr())
+#      asyncio.get_event_loop().run_forever()
+#  
+#  
+#  
+#  
+#  print("Starting autogenerate thread")
+#  tr_autogen = Thread(target=generate_content_cr)
+#  # (Starting as a daemon means the thread will not prevent the process from exiting.)
+#  #tr_autogen.daemon = True
+#  tr_autogen.start()
+#  
+#  print("Looping")
+#  while(1):
+#      time.sleep(1)
+#  
+#  
+#  print("jlkjl")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
     def handle(self):
@@ -214,7 +281,7 @@ def build_tcpserver():
 print ("Launching tcp server:")
 tr_tcp = Thread(target=build_tcpserver)
 # (Starting as a daemon means the thread will not prevent the process from exiting.)
-tr_tcp.daemon = True
+#tr_tcp.daemon = True
 tr_tcp.start()
 
 
@@ -321,8 +388,20 @@ def websockets_thread():
 print ("Launching websockets server:")
 tr_websockets = Thread(target=websockets_thread)
 # (Starting as a daemon means the thread will not prevent the process from exiting.)
-tr_websockets.daemon = True
+#tr_websockets.daemon = True
 tr_websockets.start()
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
