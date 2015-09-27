@@ -24,9 +24,73 @@ class ProcessMgrIO(object):
     def register(self,):
         pass
 
+import subprocess
+from subprocess import Popen
+
+def start_process_mgr(process_mgr_name):
+    print ('Pretending to be client:Msg=%s' % process_mgr_name)
+
+
+    ip, port = "localhost", common.Ports.ProcessMgrs
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((ip, port))
+
+    process_list = [
+        ('process1', Popen('top', stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1 ), { 1:'stdout',2:'stderr'} ),
+        ('process2', Popen('top', stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1 ), { 3:'stdout',4:'stderr'} ),
+        ('process3', Popen('top', stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1 ), { 5:'stdout',6:'stderr'} ),
+            ]
+        
+    msg = {'name':'MgrX','processes': [
+        dict([ ('name',p0), ('outpipes',p2) ]) for (p0,p1,p2) in process_list] 
+        }
+
+#   msg = {'name':'MgrX','processes': [
+#            {'name': 'ProcessA', 'outpipes':{ 1:'stdout',2:'stderr'} },
+#            {'name': 'ProcessB', 'outpipes':{ 3:'stdout',4:'stderr'} },
+#            ]
+#       }
+    send_msg(sock=sock, subport=0, message=json.dumps(msg) )
+
+
+    while True:
+        for (pname, proc, pipes) in process_list:
+
+            pipes_inv = { v:k for (k,v) in pipes.items()}
+
+            
+            if proc.poll() is None:
+                print("Polled")
+                stdout_data = proc.stdout.readline()
+                print("Polled XX")
+                #stderr_data = proc.stderr.readline()
+                stderr_data = "jkklJ".encode('utf-8')
+                print("Read")
+
+                if stdout_data:
+                    send_msg(sock=sock, subport=pipes_inv['stdout'], message=stdout_data)
+                if stderr_data:
+                    send_msg(sock=sock, subport=pipes_inv['stderr'], message=stderr_data)
+
+
+    sock.close()
+
+
+
+
+
 
 def send_msg( sock, subport, message):
-    msg_bytes = bytes(message, 'utf-8')
+    print(type(message))
+    if isinstance(message, bytes):
+        msg_bytes = message
+        pass # its all set.
+    elif isinstance(message, str):
+        msg_bytes = bytes(message, 'utf-8')
+    else:
+        assert(0)
+
+    #msg_bytes = bytes(message, 'utf-8')
     sock.sendall( bytes("%d\n" % len(msg_bytes),'utf-8'  ) )
     sock.sendall( bytes('%d\n' % subport, 'utf-8') )
     sock.sendall( msg_bytes )
@@ -63,6 +127,9 @@ def client(message, ip, port):
 
 
 
+if __name__ == "__main__":
+    start_process_mgr('Mgr2')
+    assert(0)
 
 
 
