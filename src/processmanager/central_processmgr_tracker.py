@@ -89,7 +89,7 @@ def generate_content_cr():
     logger.info("Started")
 
     while(1):
-        time.sleep(1)
+        #time.sleep(1)
 
         # Clear out old sockets:
         with websockets_lock:
@@ -133,10 +133,10 @@ class WebSocketApi:
         # Here -> websocket clients
         SendCfgProcMgrList = 'cfg-process-mgr-list'
         SendCfgProcMgrClosed = 'cfg-process-mgr-closed'
-            
+
         # Here <- websocket clients
         RecvCfgSetProcMgr = "set-process-mgr"
-        
+
 
 
 
@@ -245,11 +245,12 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
     def finish(self):
         self.logger.info("Closing up socket")
-        if not self.procmgr_id:
+        if self.procmgr_id is None:
             return
 
-        # Send a message to every connected websocket to say that teh 
+        # Send a message to every connected websocket to say that teh
         # this manager is now shut.
+        self.logger.info("Closing up socket")
         for (websocket, ws_procmgr_id) in websockets.items():
             self.logger.info("Notifying websocket: %s" % id(websocket) )
             std_pkt = {'msg-type': WebSocketApi.SendCfgProcMgrClosed, 'process_mgr_id':self.procmgr_id }

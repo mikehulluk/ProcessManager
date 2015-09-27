@@ -81,14 +81,21 @@ def handle_msg(data):
     for msg in msgs:
         msg_type=msg['msg-type']
         print(msg_type)
+
         if msg_type=='cfg-process-mgr-list':
             handle_msg_config_process_mgr_list(msg)
 
-        if msg_type == 'cfg-process-mgr-details':
+        elif msg_type == 'cfg-process-mgr-details':
             handle_msg_cfg_process_mgr_details(msg)
 
-        if msg_type=='output':
+        elif msg_type=='output':
             handle_msg_output(msg)
+
+        elif msg_type=='cfg-process-mgr-closed':
+            handle_msg_process_mgr_closed(msg)
+
+        else:
+            print ("Unexpected messgae: %s", msg_type)
 
 
 
@@ -167,6 +174,17 @@ def handle_msg_cfg_process_mgr_details(msg):
             code_blks[ (process_id, output_pipe) ] = nCode
 
 
+
+
+
+# ------- Switching to a new process manager: --------------
+def handle_msg_process_mgr_closed(msg):
+    """<div class="alert alert-danger" role="alert">...</div>"""
+    ctn = doc['ctn_alerts']
+    # TODO - Fix the dismiss button:
+    #<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    new_div = DIV("Process manager closed", Class="alert alert-danger alert-dismissible", role="alert" )
+    ctn <= new_div
 
 
 # Map (process_id, pipe_name) => code-html node
