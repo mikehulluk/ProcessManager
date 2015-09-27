@@ -44,10 +44,38 @@ connected_processes = {}
 
 
 
+class ConnectionMgr(object):
+    @classmethod
+    def add_process_mgr_connnection(cls, connection_msg):
+        print(connection_msg)
+        msg = connection_msg
+
+        with websockets_lock:
+            if connected_processes:
+                procmgr_id =  max( [ mgr['id'] for mgr in connected_processes.values() ]) + 1
+                next_proc_id = max( [ proc['id']  for mgr in connected_processes.values() for proc in mgr['processes'] ]) + 1
+            else:
+                procmgr_id = 0
+                next_proc_id = 0
+
+            msg['id'] = procmgr_id
+            for (i,process) in enumerate(msg['processes']):
+                process['id'] = next_proc_id + i
+
+            # Add to the list:
+            connected_processes[procmgr_id] = msg
+            pp.pprint(connected_processes)
+            #print("Connected to %d" % len(connected_processes) )
+            return procmgr_id
+
+
+
+
 # Maps websockets to data to go out:
 # {websocket -> ['hello','world']
 websocket_data = defaultdict(list)
 
+threadedtcprequesthandler_to_procmgr_id = {} #(socketserver.StreamRequestHandler):
 # Keep a list of connected processes:
 #connected_processes = {
 #    0: {'id':0, 'name':'Mgr1', 'processes': [
@@ -89,7 +117,7 @@ def generate_content_cr():
     logger.info("Started")
 
     while(1):
-        #time.sleep(1)
+        time.sleep(1)
 
         # Clear out old sockets:
         with websockets_lock:
@@ -173,7 +201,8 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         self.logger = logging.getLogger("TCP-Hander [%s]" % (id(self)) )
         self.logger.info("handle() called")
 
-        self.procmgr_id = None
+        threadedtcprequesthandler_to_procmgr_id[self] = None
+        #self.procmgr_id = None
 
         while True:
             r = self.read_msg()
@@ -190,30 +219,16 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         self.logger.debug(msg)
 
         if subport == 0:
-            # If its on subport 1, then it should be in json:
+            # If its on subport 0, then its a control message and it should be in json:
+
             self.logger.info('New process mgr added.')
             msg = json.loads(msg)
             self.logger.debug(msg)
+            
+            #self.procmgr_id = 
+            threadedtcprequesthandler_to_procmgr_id[self] = ConnectionMgr.add_process_mgr_connnection(connection_msg=msg)
+            self.logger.info("Connected to %d" % len(connected_processes) )
 
-            with websockets_lock:
-
-
-                if connected_processes:
-                    self.procmgr_id =  max( [ mgr['id'] for mgr in connected_processes.values() ]) + 1
-                    next_proc_id = max( [ proc['id']  for mgr in connected_processes.values() for proc in mgr['processes'] ]) + 1
-                else:
-                    self.procmgr_id = 0
-                    next_proc_id = 0
-
-                msg['id'] = self.procmgr_id
-                for (i,process) in enumerate(msg['processes']):
-                    process['id'] = next_proc_id + i
-
-                # Add to the list:
-                connected_processes[self.procmgr_id] = msg
-                pp.pprint(connected_processes)
-                #print("Connected to %d" % len(connected_processes) )
-                self.logger.info("Connected to %d" % len(connected_processes) )
 
 
         else:
@@ -222,7 +237,11 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
             # Lookup the port:
             with websockets_lock:
                 process, pipe_name = None,None
-                for proc in connected_processes[self.procmgr_id]['processes']:
+            
+                procmgr_id = threadedtcprequesthandler_to_procmgr_id[self]
+
+
+                for proc in connected_processes[procmgr_id]['processes']:
                     if subport_str in proc['outpipes']:
                         pipe_name = proc['outpipes'][subport_str]
                         process=proc
@@ -236,16 +255,19 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
                 std_pkt = [ {'msg-type':WebSocketApi.OutputMsg ,'process_id':process['id'], 'pipe':pipe_name, 'contents':msg}]
                 std_pkt_json = json.dumps(std_pkt)
 
+                procmgr_id = threadedtcprequesthandler_to_procmgr_id[self]
 
                 for (websocket, ws_procmgr_id) in websockets.items():
-                    if self.procmgr_id != ws_procmgr_id:
+                    if procmgr_id != ws_procmgr_id:
                         continue
                     websocket_data[websocket].append(std_pkt_json)
 
 
     def finish(self):
         self.logger.info("Closing up socket")
-        if self.procmgr_id is None:
+        
+        procmgr_id = threadedtcprequesthandler_to_procmgr_id[self]
+        if procmgr_id is None:
             return
 
         # Send a message to every connected websocket to say that teh
@@ -253,14 +275,14 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         self.logger.info("Closing up socket")
         for (websocket, ws_procmgr_id) in websockets.items():
             self.logger.info("Notifying websocket: %s" % id(websocket) )
-            std_pkt = {'msg-type': WebSocketApi.SendCfgProcMgrClosed, 'process_mgr_id':self.procmgr_id }
+            std_pkt = {'msg-type': WebSocketApi.SendCfgProcMgrClosed, 'process_mgr_id':procmgr_id }
             std_pkt_json = json.dumps([std_pkt])
             websocket_data[websocket].append(std_pkt_json)
 
 
 
         with websockets_lock:
-            del connected_processes[self.procmgr_id]
+            del connected_processes[procmgr_id]
 
 
 
