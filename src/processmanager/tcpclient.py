@@ -59,6 +59,7 @@ def start_process_mgr(process_mgr_name):
             pipes_inv = { v:k for (k,v) in pipes.items()}
 
 
+            time.sleep(10)
             if proc.poll() is None:
                 print("Polled")
                 stdout_data = proc.stdout.readline()

@@ -26,6 +26,32 @@ import pprint as pp
 import common
 from collections import defaultdict
 
+from types import MethodType
+
+
+@asyncio.coroutine
+def _ws_send_msg(self, msg ):
+    yield from self.send(json.dumps([msg]))
+
+
+ws.WebSocketServerProtocol.send_msg = _ws_send_msg
+# # Monkey patch websockets to add:
+# #  * send_msg()
+# #  * send_msgs()
+# # functions.
+# 
+# 
+# #yield from websocket.send(json.dumps([init_data]))
+# print( websocket.WebSocketServerProtocol )
+
+
+
+
+
+
+
+
+
 
 # Basic logging info:
 logging.basicConfig(level=logging.INFO)
@@ -169,6 +195,16 @@ class ConnectionMgr(object):
             del websockets[websocket]
 
 
+
+
+class MsgBuilderWebsocket(object):
+    @classmethod
+    def createSendCfgProcMgrList(cls):
+        init_data = {
+            'msg-type': WebSocketApi.SendCfgProcMgrList,
+            'process_mgrs': list( connected_processes.values() )
+            }
+        return init_data
 
 
 
@@ -369,14 +405,18 @@ def websocket_handler(websocket, path):
     ConnectionMgr.websocket_open_connection(websocket=websocket)
 
 
+    #print(websocket)
+    #assert(0)
 
     # Send the initial message:
-    init_data = {
-            'msg-type': WebSocketApi.SendCfgProcMgrList,
-            'process_mgrs': list( connected_processes.values() )
-            }
+    init_data = MsgBuilderWebsocket.createSendCfgProcMgrList() 
+            #{
+            #'msg-type': WebSocketApi.SendCfgProcMgrList,
+            #'process_mgrs': list( connected_processes.values() )
+            #}
+    yield from websocket.send_msg(init_data) # = MethodType(_ws_send_msg, ws.WebSocketServerProtocol)
 
-    yield from websocket.send(json.dumps([init_data]))
+    #yield from websocket.send(json.dumps([init_data]))
 
 
     # Msg loop:
@@ -408,9 +448,7 @@ def websocket_handler(websocket, path):
                 return_msg = {'msg-type': WebSocketApi.SendCfgProcMgrDetails}
                 return_msg.update(process_mgr_data)
 
-
-                init_data_s = json.dumps([return_msg])
-                yield from websocket.send(init_data_s)
+                yield from websocket.send( json.dumps([return_msg]) )
 
 
             else:
