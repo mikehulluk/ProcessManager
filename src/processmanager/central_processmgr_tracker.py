@@ -71,7 +71,7 @@ class ConnectionMgr(object):
             #return procmgr_id
 
     @classmethod
-    def close_process_mgr_connnection(cls, socket):
+    def process_mgr_close_connection(cls, socket):
 
         procmgr_id = threadedtcprequesthandler_to_procmgr_id[socket]
         if procmgr_id is None:
@@ -90,6 +90,48 @@ class ConnectionMgr(object):
 
         with websockets_lock:
             del connected_processes[procmgr_id]
+
+
+
+
+    @classmethod
+    def process_mgr_recv_output_data(cls, socket, subport, msg):
+        subport_str = str(subport)
+        # Lookup the port:
+        with websockets_lock:
+            process, pipe_name = None,None
+
+            procmgr_id = threadedtcprequesthandler_to_procmgr_id[socket]
+
+
+            for proc in connected_processes[procmgr_id]['processes']:
+                if subport_str in proc['outpipes']:
+                    pipe_name = proc['outpipes'][subport_str]
+                    process=proc
+                    break
+
+            assert(pipe_name and proc)
+
+
+            # Ok, we can now send out a packet to each websocket:
+
+            std_pkt = [ {'msg-type':WebSocketApi.OutputMsg ,'process_id':process['id'], 'pipe':pipe_name, 'contents':msg}]
+            std_pkt_json = json.dumps(std_pkt)
+
+            procmgr_id = threadedtcprequesthandler_to_procmgr_id[socket]
+
+            for (websocket, ws_procmgr_id) in websockets.items():
+                if procmgr_id != ws_procmgr_id:
+                    continue
+                websocket_data[websocket].append(std_pkt_json)
+
+
+
+
+
+
+
+
 
 
 
@@ -248,62 +290,14 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
             ConnectionMgr.add_process_mgr_connnection(socket=self, connection_msg=msg)
 
-
-
         else:
             self.logger.info("Preparing to forward msg:")
-            subport_str = str(subport)
-            # Lookup the port:
-            with websockets_lock:
-                process, pipe_name = None,None
-
-                procmgr_id = threadedtcprequesthandler_to_procmgr_id[self]
-
-
-                for proc in connected_processes[procmgr_id]['processes']:
-                    if subport_str in proc['outpipes']:
-                        pipe_name = proc['outpipes'][subport_str]
-                        process=proc
-                        break
-
-                assert(pipe_name and proc)
-
-
-                # Ok, we can now send out a packet to each websocket:
-
-                std_pkt = [ {'msg-type':WebSocketApi.OutputMsg ,'process_id':process['id'], 'pipe':pipe_name, 'contents':msg}]
-                std_pkt_json = json.dumps(std_pkt)
-
-                procmgr_id = threadedtcprequesthandler_to_procmgr_id[self]
-
-                for (websocket, ws_procmgr_id) in websockets.items():
-                    if procmgr_id != ws_procmgr_id:
-                        continue
-                    websocket_data[websocket].append(std_pkt_json)
+            ConnectionMgr.process_mgr_recv_output_data(socket=self, subport=subport, msg=msg)
 
 
     def finish(self):
         self.logger.info("Closing up socket")
-        ConnectionMgr.close_process_mgr_connnection(socket=self)
-        #self.logger.info("Closing up socket")
-
-        #procmgr_id = threadedtcprequesthandler_to_procmgr_id[self]
-        #if procmgr_id is None:
-        #    return
-
-        ## Send a message to every connected websocket to say that teh
-        ## this manager is now shut.
-        #self.logger.info("Closing up socket")
-        #for (websocket, ws_procmgr_id) in websockets.items():
-        #    self.logger.info("Notifying websocket: %s" % id(websocket) )
-        #    std_pkt = {'msg-type': WebSocketApi.SendCfgProcMgrClosed, 'process_mgr_id':procmgr_id }
-        #    std_pkt_json = json.dumps([std_pkt])
-        #    websocket_data[websocket].append(std_pkt_json)
-
-
-
-        #with websockets_lock:
-        #    del connected_processes[procmgr_id]
+        ConnectionMgr.process_mgr_close_connection(socket=self)
 
 
 
