@@ -204,8 +204,12 @@ class ConnectionMgr(object):
         websockets = {ws:mgr_id for (ws,mgr_id) in websockets.items() if ws.open}
 
     @classmethod
-    def websocket_get_outstanding_data_messages(cls, websocket):
-        return websocket_data[websocket]
+    def websocket_get_outstanding_data_messages(cls, websocket, clear=True):
+        res =  websocket_data[websocket]
+        if clear:
+            websocket_data[websocket] = []
+        return res
+
 
     @classmethod
     def websocket_get_active_sockets(cls,):
@@ -244,7 +248,8 @@ class MsgBuilderWebsocket(object):
 
 
 
-
+# ------------ Our forwarding thread ----------------
+# ---------------------------------------------------
 
 @asyncio.coroutine
 def forward_to_websocket_cr():
@@ -261,10 +266,9 @@ def forward_to_websocket_cr():
         # Forward outstanding messages:
         with websockets_lock:
             for websocket in ConnectionMgr.websocket_get_active_sockets():
-                for data in ConnectionMgr.websocket_get_outstanding_data_messages(websocket): 
+                for data in ConnectionMgr.websocket_get_outstanding_data_messages(websocket, clear=True): 
                     logger.info("Forwarding message to: %s --> %s" % (id(websocket), data))
                     yield from websocket.send(data)
-                websocket_data[websocket] = []
 
 def forward_to_websocket_thread():
     loop = asyncio.new_event_loop()
@@ -272,25 +276,23 @@ def forward_to_websocket_thread():
     asyncio.get_event_loop().run_until_complete(forward_to_websocket_cr())
     asyncio.get_event_loop().run_forever()
 
-
-
-
-print("Starting autogenerate thread")
-tr_autogen = Thread(target=forward_to_websocket_thread)
-# (Starting as a daemon means the thread will not prevent the process from exiting.)
-tr_autogen.daemon = True
-tr_autogen.start()
-
-
-
+def start_thread_websocket_forwarding():
+    print("Starting autogenerate thread")
+    tr_autogen = Thread(target=forward_to_websocket_thread)
+    # (Starting as a daemon means the thread will not prevent the process from exiting.)
+    tr_autogen.daemon = True
+    tr_autogen.start()
+    return tr_autogen
 
 
 
 
 
 
-class WebSocketApi:
-        OutputMsg = 'output'
+
+
+
+class WebSocketApi: OutputMsg = 'output'
 
         # Here -> websocket clients
         SendCfgProcMgrList = 'cfg-process-mgr-list'
@@ -299,7 +301,6 @@ class WebSocketApi:
 
         # Here <- websocket clients
         RecvCfgSetProcMgr = "set-process-mgr"
-
 
 
 
@@ -355,7 +356,7 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         if subport == 0:
             # If its on subport 0, then its a control message and it should be in json:
 
-            self.logger.info('New process mgr added.')
+            self.logger.info('New process-mgr found')
             msg = json.loads(msg)
             self.logger.debug(msg)
 
@@ -393,12 +394,13 @@ def build_tcpserver():
     server_thread.start()
 
 
-
-print ("Launching tcp server:")
-tr_tcp = Thread(target=build_tcpserver)
-# (Starting as a daemon means the thread will not prevent the process from exiting.)
-#tr_tcp.daemon = True
-tr_tcp.start()
+def start_thread_process_mgr_listener():
+    print ("Launching tcp server:")
+    tr_tcp = Thread(target=build_tcpserver)
+    # (Starting as a daemon means the thread will not prevent the process from exiting.)
+    #tr_tcp.daemon = True
+    tr_tcp.start()
+    return tr_tcp
 
 
 
@@ -482,13 +484,15 @@ def websockets_thread():
 
 
 
-# And launch the websockets server in a new thread::
-print ("Launching websockets server:")
-tr_websockets = Thread(target=websockets_thread)
-# (Starting as a daemon means the thread will not prevent the process from exiting.)
-#tr_websockets.daemon = True
-tr_websockets.start()
-
+def start_thread_websocket_listener():
+    # And launch the websockets server in a new thread::
+    print ("Launching websockets server:")
+    tr_websockets = Thread(target=websockets_thread)
+    # (Starting as a daemon means the thread will not prevent the process from exiting.)
+    #tr_websockets.daemon = True
+    tr_websockets.start()
+    return tr_websockets
+    
 
 
 
@@ -510,6 +514,9 @@ tr_websockets.start()
 
 
 try:
+    tr_ws_forwarding = start_thread_websocket_forwarding()
+    tr_tcp = start_thread_process_mgr_listener()
+    tr_websockets = start_thread_websocket_listener():
     #tr.join()
     tr_websockets.join()
     tr_tcp.join()
@@ -517,3 +524,4 @@ except:
     print( "Exception Raise")
     print( "TODO:: KILL THREADS")
     raise
+
