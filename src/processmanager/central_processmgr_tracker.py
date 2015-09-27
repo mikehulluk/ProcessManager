@@ -195,6 +195,25 @@ class ConnectionMgr(object):
             del websockets[websocket]
 
 
+    @classmethod
+    def websocket_ensure_all_sockets_open(cls,):
+        global websockets
+        with websockets_lock:
+            for (ws,mgr_id) in websockets.items():
+                assert (ws.open)
+        websockets = {ws:mgr_id for (ws,mgr_id) in websockets.items() if ws.open}
+
+    @classmethod
+    def websocket_get_outstanding_data_messages(cls, websocket):
+        return websocket_data[websocket]
+
+    @classmethod
+    def websocket_get_active_sockets(cls,):
+        return websockets.keys()
+
+
+
+
 
 
 class MsgBuilderWebsocket(object):
@@ -228,39 +247,36 @@ class MsgBuilderWebsocket(object):
 
 
 @asyncio.coroutine
-def generate_content_cr():
+def forward_to_websocket_cr():
     global websockets
 
     logger = logging.getLogger("Forwarding thread")
     logger.info("Started")
 
     while(1):
-        time.sleep(1)
-
+        time.sleep(0)
         # Clear out old sockets:
-        with websockets_lock:
-            websockets = {ws:mgr_id for (ws,mgr_id) in websockets.items() if ws.open}
+        ConnectionMgr.websocket_ensure_all_sockets_open()
 
         # Forward outstanding messages:
         with websockets_lock:
-            for websocket in websockets:
-                # Send all outstanding message
-                for data in websocket_data[websocket]:
+            for websocket in ConnectionMgr.websocket_get_active_sockets():
+                for data in ConnectionMgr.websocket_get_outstanding_data_messages(websocket): 
                     logger.info("Forwarding message to: %s --> %s" % (id(websocket), data))
                     yield from websocket.send(data)
                 websocket_data[websocket] = []
 
-def generate_content_thread():
+def forward_to_websocket_thread():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    asyncio.get_event_loop().run_until_complete(generate_content_cr())
+    asyncio.get_event_loop().run_until_complete(forward_to_websocket_cr())
     asyncio.get_event_loop().run_forever()
 
 
 
 
 print("Starting autogenerate thread")
-tr_autogen = Thread(target=generate_content_thread)
+tr_autogen = Thread(target=forward_to_websocket_thread)
 # (Starting as a daemon means the thread will not prevent the process from exiting.)
 tr_autogen.daemon = True
 tr_autogen.start()
@@ -441,11 +457,7 @@ def websocket_handler(websocket, path):
                 # Store which process_mgr the websocket is interested in:
                 ConnectionMgr.websocket_cfg_set_process_mgr(websocket=websocket, mgr_id=mgr_id)
 
-                # And return the configuration for this process-mgr
-                #process_mgr_data = connected_processes[mgr_id]
-                #return_msg = {'msg-type': WebSocketApi.SendCfgProcMgrDetails}
-                #return_msg.update(process_mgr_data)
-
+                # And send back the configuration info:
                 msg = MsgBuilderWebsocket.createSendCfgProcMgrDetails(mgr_id=mgr_id)
                 yield from websocket.send_msg(msg)
 
