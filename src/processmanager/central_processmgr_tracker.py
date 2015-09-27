@@ -41,12 +41,41 @@ websockets_lock = Lock()
 websockets = {}
 
 connected_processes = {}
+# Maps websockets to data to go out:
+# {websocket -> ['hello','world']
+# Keep a list of connected processes:
+#connected_processes = {
+#    0: {'id':0, 'name':'Mgr1', 'processes': [
+#        {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':{1: 'stdout', 2:'stderr'}  },
+#        {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':{3: 'stdout', 4:'stderr'}  },
+#                    ]
+#            },
+#
+#    1: {'id':1, 'name':'Mgr2', 'processes': [
+#        {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':{1:'stdout',2:'stderr'}  },
+#                    ]
+#            },
+#
+#    2: {'id':2, 'name':'Mgr3', 'processes': [
+#        {'id':4, 'name':'Process1', 'start_time':None, 'outpipes':{1:'stdout-stderr'}  },
+#        {'id':5, 'name':'Process1', 'start_time':None, 'outpipes':{2:'stdout-stderr'}  },
+#        {'id':6, 'name':'Process1', 'start_time':None, 'outpipes':{3:'stdout-stderr'}  },
+#                    ]
+#            },
+#
+#}
+
+
+
+websocket_data = defaultdict(list)
+
+threadedtcprequesthandler_to_procmgr_id = {} #(socketserver.StreamRequestHandler):
 
 
 
 class ConnectionMgr(object):
     @classmethod
-    def add_process_mgr_connnection(cls, socket, connection_msg):
+    def process_mgr_open_connection(cls, socket, connection_msg):
         print(connection_msg)
         msg = connection_msg
 
@@ -68,7 +97,6 @@ class ConnectionMgr(object):
             #print("Connected to %d" % len(connected_processes) )
             threadedtcprequesthandler_to_procmgr_id[socket] = procmgr_id
             socket.logger.info("Connected to %d" % len(connected_processes) )
-            #return procmgr_id
 
     @classmethod
     def process_mgr_close_connection(cls, socket):
@@ -90,9 +118,6 @@ class ConnectionMgr(object):
 
         with websockets_lock:
             del connected_processes[procmgr_id]
-
-
-
 
     @classmethod
     def process_mgr_recv_output_data(cls, socket, subport, msg):
@@ -126,41 +151,28 @@ class ConnectionMgr(object):
                 websocket_data[websocket].append(std_pkt_json)
 
 
+    @classmethod
+    def websocket_open_connection(cls, websocket):
+
+        # Add the websocket to the list:
+        with websockets_lock:
+            websockets[websocket] = None
+
+    @classmethod
+    def websocket_cfg_set_process_mgr(cls, websocket, mgr_id):
+        with websockets_lock:
+            websockets[websocket] = mgr_id
+
+    @classmethod
+    def websocket_close_connection(cls, websocket):
+        with websockets_lock:
+            del websockets[websocket]
 
 
 
 
 
 
-
-
-
-# Maps websockets to data to go out:
-# {websocket -> ['hello','world']
-websocket_data = defaultdict(list)
-
-threadedtcprequesthandler_to_procmgr_id = {} #(socketserver.StreamRequestHandler):
-# Keep a list of connected processes:
-#connected_processes = {
-#    0: {'id':0, 'name':'Mgr1', 'processes': [
-#        {'id':0, 'name':'Process1', 'start_time':None, 'outpipes':{1: 'stdout', 2:'stderr'}  },
-#        {'id':1, 'name':'Process2', 'start_time':None, 'outpipes':{3: 'stdout', 4:'stderr'}  },
-#                    ]
-#            },
-#
-#    1: {'id':1, 'name':'Mgr2', 'processes': [
-#        {'id':2, 'name':'Process1', 'start_time':None, 'outpipes':{1:'stdout',2:'stderr'}  },
-#                    ]
-#            },
-#
-#    2: {'id':2, 'name':'Mgr3', 'processes': [
-#        {'id':4, 'name':'Process1', 'start_time':None, 'outpipes':{1:'stdout-stderr'}  },
-#        {'id':5, 'name':'Process1', 'start_time':None, 'outpipes':{2:'stdout-stderr'}  },
-#        {'id':6, 'name':'Process1', 'start_time':None, 'outpipes':{3:'stdout-stderr'}  },
-#                    ]
-#            },
-#
-#}
 
 
 
@@ -225,6 +237,7 @@ class WebSocketApi:
         # Here -> websocket clients
         SendCfgProcMgrList = 'cfg-process-mgr-list'
         SendCfgProcMgrClosed = 'cfg-process-mgr-closed'
+        SendCfgProcMgrDetails = 'cfg-process-mgr-details'
 
         # Here <- websocket clients
         RecvCfgSetProcMgr = "set-process-mgr"
@@ -288,7 +301,7 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
             msg = json.loads(msg)
             self.logger.debug(msg)
 
-            ConnectionMgr.add_process_mgr_connnection(socket=self, connection_msg=msg)
+            ConnectionMgr.process_mgr_open_connection(socket=self, connection_msg=msg)
 
         else:
             self.logger.info("Preparing to forward msg:")
@@ -353,34 +366,27 @@ def websocket_handler(websocket, path):
     logger = logging.getLogger("Websocket-Hander [%s]" % (id(websocket)) )
     logger.info("websocket_handle() called")
 
+    ConnectionMgr.websocket_open_connection(websocket=websocket)
+
+
+
     # Send the initial message:
-    init_data = [
-            {
+    init_data = {
             'msg-type': WebSocketApi.SendCfgProcMgrList,
             'process_mgrs': list( connected_processes.values() )
             }
-            ]
 
-    #pp.pprint(connected_processes)
-
-
-    init_data_s = json.dumps(init_data) # , separators=(',',':'))
-    yield from websocket.send(init_data_s)
-
-    # Add the websocket to the list:
-    with websockets_lock:
-        websockets[websocket] = None
+    yield from websocket.send(json.dumps([init_data]))
 
 
+    # Msg loop:
     while 1:
         msg_ins  = yield from websocket.recv()
-        #print ("Data in!! %s", msg_ins)
 
         # Has the socket closed?
         if msg_ins is None:
-            print("Socket closed. (By remote?)")
-            with websockets_lock:
-                del websockets[websocket]
+            ConnectionMgr.websocket_close_connection(cls, websocket)
+            logger.log("Socket closed. (By remote?)")
             return
 
 
@@ -390,21 +396,22 @@ def websocket_handler(websocket, path):
         for msg in msgs:
             msg_type = msg['msg-type']
 
-            if msg_type==WebSocketApi.RecvCfgSetProcMgr: #"set-process-mgr":
+            if msg_type==WebSocketApi.RecvCfgSetProcMgr:
 
                 mgr_id = int( msg['process-mgr-id'] )
-                process_mgr_data = connected_processes[mgr_id]
 
-                return_msg = {'msg-type': 'cfg-process-mgr-details'}
+                # Store which process_mgr the websocket is interested in:
+                ConnectionMgr.websocket_cfg_set_process_mgr(websocket=websocket, mgr_id=mgr_id)
+
+                # And return the configuration for this process-mgr
+                process_mgr_data = connected_processes[mgr_id]
+                return_msg = {'msg-type': WebSocketApi.SendCfgProcMgrDetails}
                 return_msg.update(process_mgr_data)
 
 
-                init_data_s = json.dumps([return_msg], separators=(',',':'))
+                init_data_s = json.dumps([return_msg])
                 yield from websocket.send(init_data_s)
 
-                # And store which process_mgr the websocket is interested in:
-                with websockets_lock:
-                    websockets[websocket] = mgr_id
 
             else:
                 print ("Unhandled msg-type: %s" % msg_type)
