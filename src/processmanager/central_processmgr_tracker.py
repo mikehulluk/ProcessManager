@@ -127,6 +127,16 @@ tr_autogen.start()
 
 
 
+class WebSocketApi:
+        OutputMsg = 'output'
+
+        # Here -> websocket clients
+        SendCfgProcMgrList = 'cfg-process-mgr-list'
+        SendCfgProcMgrClosed = 'cfg-process-mgr-closed'
+            
+        # Here <- websocket clients
+        RecvCfgSetProcMgr = "set-process-mgr"
+        
 
 
 
@@ -222,7 +232,8 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
 
                 # Ok, we can now send out a packet to each websocket:
-                std_pkt = [ {'msg-type':'output','process_id':process['id'], 'pipe':pipe_name, 'contents':msg}]
+
+                std_pkt = [ {'msg-type':WebSocketApi.OutputMsg ,'process_id':process['id'], 'pipe':pipe_name, 'contents':msg}]
                 std_pkt_json = json.dumps(std_pkt)
 
 
@@ -231,15 +242,22 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
                         continue
                     websocket_data[websocket].append(std_pkt_json)
 
-                    #if websocket.open:
-                        #print("Forwarding to websocket....%d", (websocket))
-                        #websocket.send(std_pkt_json)
-                        #print("Sent...")
 
     def finish(self):
         self.logger.info("Closing up socket")
         if not self.procmgr_id:
             return
+
+        # Send a message to every connected websocket to say that teh 
+        # this manager is now shut.
+        for (websocket, ws_procmgr_id) in websockets.items():
+            self.logger.info("Notifying websocket: %s" % id(websocket) )
+            std_pkt = {'msg-type': WebSocketApi.SendCfgProcMgrClosed, 'process_mgr_id':self.procmgr_id }
+            std_pkt_json = json.dumps([std_pkt])
+            websocket_data[websocket].append(std_pkt_json)
+
+
+
         with websockets_lock:
             del connected_processes[self.procmgr_id]
 
@@ -297,13 +315,10 @@ def websocket_handler(websocket, path):
     logger = logging.getLogger("Websocket-Hander [%s]" % (id(websocket)) )
     logger.info("websocket_handle() called")
 
-    print("Connection openned")
-    #websocket.enableTrace(True)
-
-
+    # Send the initial message:
     init_data = [
             {
-            'msg-type':'cfg-process-mgr-list',
+            'msg-type': WebSocketApi.SendCfgProcMgrList,
             'process_mgrs': list( connected_processes.values() )
             }
             ]
@@ -337,7 +352,7 @@ def websocket_handler(websocket, path):
         for msg in msgs:
             msg_type = msg['msg-type']
 
-            if msg_type=="set-process-mgr":
+            if msg_type==WebSocketApi.RecvCfgSetProcMgr: #"set-process-mgr":
 
                 mgr_id = int( msg['process-mgr-id'] )
                 process_mgr_data = connected_processes[mgr_id]
