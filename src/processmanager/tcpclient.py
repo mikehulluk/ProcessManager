@@ -11,6 +11,19 @@ from threading import Thread
 
 import common
 
+class ProcessMgrProcess(object):
+    def __init__(self, process_name):
+        self.process_name = process_name
+
+class ProcessMgrIO(object):
+    def __init__(self, process_mgr_name):
+        self.process_mgr_name = process_mgr_name
+        self.processes = []
+    def add_process(self, process):
+        self.processes.append(process)
+    def register(self,):
+        pass
+
 
 def send_msg( sock, subport, message):
     msg_bytes = bytes(message, 'utf-8')
@@ -54,9 +67,6 @@ def client(message, ip, port):
 
 
 if __name__ == "__main__":
-    #client('127.0.0.1', 6000, 0, "Hello World 1")
-    #client('127.0.0.1', 6000, 1, "Hello World 1")
-    #client('127.0.0.1', 6000, 2, "Hello World 1")
 
     HOST, PORT = "localhost", common.Ports.ProcessMgrs
 

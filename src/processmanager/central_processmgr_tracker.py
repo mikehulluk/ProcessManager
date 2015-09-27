@@ -25,11 +25,15 @@ import time
 import pprint as pp
 import common
 from collections import defaultdict
+
+
+# Basic logging info:
+logging.basicConfig(level=logging.INFO)
+
 # Be verbose with the logging:
 logger = logging.getLogger('websockets.server')
-logger.setLevel(logging.ERROR)
+logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
-
 
 
 
@@ -40,6 +44,8 @@ connected_processes = {}
 
 
 
+# Maps websockets to data to go out:
+# {websocket -> ['hello','world']
 websocket_data = defaultdict(list)
 
 # Keep a list of connected processes:
@@ -77,23 +83,26 @@ websocket_data = defaultdict(list)
 
 @asyncio.coroutine
 def generate_content_cr():
-    print ("Starting generate content:")
-    sys.stdout.flush()
+    global websockets
+
+    logger = logging.getLogger("Forwarding thread")
+    logger.info("Started")
 
     while(1):
         time.sleep(1)
 
+        # Clear out old sockets:
         with websockets_lock:
-            print ("Sending content..")
-            print ("NWebsockets: %d" % len(websockets))
+            websockets = {ws:mgr_id for (ws,mgr_id) in websockets.items() if ws.open}
+
+        # Forward outstanding messages:
+        with websockets_lock:
             for websocket in websockets:
-
-                if websocket.open:
-                    for data in websocket_data[websocket]:
-                        yield from websocket.send(data)
-                    websocket_data[websocket] = []
-
-
+                # Send all outstanding message
+                for data in websocket_data[websocket]:
+                    logger.info("Forwarding message to: %s --> %s" % (id(websocket), data))
+                    yield from websocket.send(data)
+                websocket_data[websocket] = []
 
 def generate_content_thread():
     loop = asyncio.new_event_loop()
@@ -129,7 +138,7 @@ tr_autogen.start()
 
 class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
-    def readMsg(self):
+    def read_msg(self):
             msg_size = self.rfile.readline()
             if not msg_size:
                 return
@@ -142,7 +151,6 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
                 to_read = msg_size - len(buff)
                 x = self.rfile.read(to_read)
                 if not x:
-                    print( 'Connection closed')
                     return
                 buff += x
 
@@ -152,12 +160,15 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
 
     def handle(self):
+        self.logger = logging.getLogger("TCP-Hander [%s]" % (id(self)) )
+        self.logger.info("handle() called")
 
         self.procmgr_id = None
 
         while True:
-            r = self.readMsg()
+            r = self.read_msg()
             if not r:
+                self.logger.info("Connection closed")
                 return
             (subport,msg) = r
             self.handleMsgMJHX( subport=subport, msg=msg )
@@ -165,18 +176,17 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
 
     def handleMsgMJHX(self, subport, msg):
-        print ('Handling Message Port:%d Length:%d' %(subport, len(msg)) )
-        print (msg)
-        print ('\n')
+        self.logger.info('Handling Message -- subport:%d length:%d' %(subport, len(msg)) )
+        self.logger.debug(msg)
 
         if subport == 0:
-            print("Hooking in!")
+            # If its on subport 1, then it should be in json:
+            self.logger.info('New process mgr added.')
             msg = json.loads(msg)
-            print (msg)
+            self.logger.debug(msg)
 
             with websockets_lock:
 
-                print("New Process Mgr Connected")
 
                 if connected_processes:
                     self.procmgr_id =  max( [ mgr['id'] for mgr in connected_processes.values() ]) + 1
@@ -192,29 +202,23 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
                 # Add to the list:
                 connected_processes[self.procmgr_id] = msg
                 pp.pprint(connected_processes)
-                print("Connected to %d" % len(connected_processes) )
+                #print("Connected to %d" % len(connected_processes) )
+                self.logger.info("Connected to %d" % len(connected_processes) )
 
 
         else:
-            print("Forwarding message....")
+            self.logger.info("Preparing to forward msg:")
             subport_str = str(subport)
             # Lookup the port:
             with websockets_lock:
                 process, pipe_name = None,None
                 for proc in connected_processes[self.procmgr_id]['processes']:
-                    #print ("AA")
-                    #print (proc['outpipes'])
                     if subport_str in proc['outpipes']:
                         pipe_name = proc['outpipes'][subport_str]
                         process=proc
                         break
-                    #print ("BB")
-                #print("Subport_str: %s" %subport_str)
-                #print("Pipename: %s" %pipe_name)
 
-                assert(pipe_name)
-                assert(proc)
-                #print ("Found pipename: %s", pipe_name)
+                assert(pipe_name and proc)
 
 
                 # Ok, we can now send out a packet to each websocket:
@@ -222,23 +226,18 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
                 std_pkt_json = json.dumps(std_pkt)
 
 
-                #with websockets_lock:
-                #print ("Sending content..")
-                #print ("NWebsockets: %d" % len(websockets))
                 for (websocket, ws_procmgr_id) in websockets.items():
-                    #print([self.procmgr_id, ws_procmgr_id])
                     if self.procmgr_id != ws_procmgr_id:
                         continue
+                    websocket_data[websocket].append(std_pkt_json)
 
-                    if websocket.open:
-                        print("Forwarding to websocket....%d", (websocket))
-                        #assert(0)
-                        websocket_data[websocket].append(std_pkt_json)
-                        websocket.send(std_pkt_json)
-                        print("Sent...")
+                    #if websocket.open:
+                        #print("Forwarding to websocket....%d", (websocket))
+                        #websocket.send(std_pkt_json)
+                        #print("Sent...")
 
     def finish(self):
-        print ("Closing up socket")
+        self.logger.info("Closing up socket")
         if not self.procmgr_id:
             return
         with websockets_lock:
@@ -295,6 +294,8 @@ tr_tcp.start()
 
 @asyncio.coroutine
 def websocket_handler(websocket, path):
+    logger = logging.getLogger("Websocket-Hander [%s]" % (id(websocket)) )
+    logger.info("websocket_handle() called")
 
     print("Connection openned")
     #websocket.enableTrace(True)
@@ -307,10 +308,10 @@ def websocket_handler(websocket, path):
             }
             ]
 
-    pp.pprint(connected_processes)
+    #pp.pprint(connected_processes)
 
 
-    init_data_s = json.dumps(init_data, separators=(',',':'))
+    init_data_s = json.dumps(init_data) # , separators=(',',':'))
     yield from websocket.send(init_data_s)
 
     # Add the websocket to the list:
@@ -319,8 +320,6 @@ def websocket_handler(websocket, path):
 
 
     while 1:
-
-
         msg_ins  = yield from websocket.recv()
         #print ("Data in!! %s", msg_ins)
 
