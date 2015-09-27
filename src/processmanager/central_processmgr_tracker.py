@@ -206,6 +206,12 @@ class MsgBuilderWebsocket(object):
             }
         return init_data
 
+    @classmethod
+    def createSendCfgProcMgrDetails(cls, mgr_id):
+        process_mgr_data = connected_processes[mgr_id]
+        return_msg = {'msg-type': WebSocketApi.SendCfgProcMgrDetails}
+        return_msg.update(process_mgr_data)
+        return return_msg
 
 
 
@@ -405,18 +411,10 @@ def websocket_handler(websocket, path):
     ConnectionMgr.websocket_open_connection(websocket=websocket)
 
 
-    #print(websocket)
-    #assert(0)
-
     # Send the initial message:
     init_data = MsgBuilderWebsocket.createSendCfgProcMgrList() 
-            #{
-            #'msg-type': WebSocketApi.SendCfgProcMgrList,
-            #'process_mgrs': list( connected_processes.values() )
-            #}
-    yield from websocket.send_msg(init_data) # = MethodType(_ws_send_msg, ws.WebSocketServerProtocol)
+    yield from websocket.send_msg(init_data)
 
-    #yield from websocket.send(json.dumps([init_data]))
 
 
     # Msg loop:
@@ -444,11 +442,12 @@ def websocket_handler(websocket, path):
                 ConnectionMgr.websocket_cfg_set_process_mgr(websocket=websocket, mgr_id=mgr_id)
 
                 # And return the configuration for this process-mgr
-                process_mgr_data = connected_processes[mgr_id]
-                return_msg = {'msg-type': WebSocketApi.SendCfgProcMgrDetails}
-                return_msg.update(process_mgr_data)
+                #process_mgr_data = connected_processes[mgr_id]
+                #return_msg = {'msg-type': WebSocketApi.SendCfgProcMgrDetails}
+                #return_msg.update(process_mgr_data)
 
-                yield from websocket.send( json.dumps([return_msg]) )
+                msg = MsgBuilderWebsocket.createSendCfgProcMgrDetails(mgr_id=mgr_id)
+                yield from websocket.send_msg(msg)
 
 
             else:
